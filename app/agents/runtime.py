@@ -2,6 +2,7 @@
 from app.agents.message_bus import MessageBus
 from app.agents.venue_agent import VenueAgent
 from app.agents.booking_agent import BookingAgent
+from app.agents.ticket_agent import TicketAgent
 
 
 def create_agent_runtime():
@@ -21,11 +22,18 @@ def create_agent_runtime():
         message_bus=message_bus
     )
 
+    ticket_agent = TicketAgent(
+        name="TicketAgent",
+        message_bus=message_bus
+    )
+
     message_bus.register(venue_agent)
     message_bus.register(booking_agent)
+    message_bus.register(ticket_agent)
 
     return {
         "message_bus": message_bus,
         "venue_agent": venue_agent,
-        "booking_agent": booking_agent
+        "booking_agent": booking_agent,
+        "ticket_agent": ticket_agent
     }
