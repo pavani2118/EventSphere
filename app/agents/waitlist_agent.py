@@ -1,7 +1,4 @@
-
 from datetime import datetime, timedelta, timezone
-
-from psycopg.types.json import Jsonb
 
 from app.database import get_db_connection
 from app.agents.base_agent import BaseAgent
@@ -9,14 +6,21 @@ from app.agents.message import ACLMessage, Performative
 
 
 class WaitlistAgent(BaseAgent):
+
     EXPIRY_DAYS = 7
 
     def receive_message(self, message: ACLMessage):
+
+        action = message.content.get("action")
+
+        # Handle INFORM messages.
         if message.performative == Performative.INFORM:
-            action = message.content.get("action")
 
             if action == "TICKETS_AVAILABLE":
                 return self.process_waitlist(message)
+
+            if action == "EXPIRE_WAITLIST":
+                return self.expire_waitlist(message)
 
             return self._reply(
                 message,
@@ -24,14 +28,13 @@ class WaitlistAgent(BaseAgent):
                 {"reason": f"Unsupported INFORM action: {action}"}
             )
 
+        # Handle REQUEST messages.
         if message.performative != Performative.REQUEST:
             return self._reply(
                 message,
                 Performative.REFUSE,
                 {"reason": "WaitlistAgent accepts REQUEST or INFORM messages."}
             )
-
-        action = message.content.get("action")
 
         if action == "JOIN_WAITLIST":
             return self.join_waitlist(message)
@@ -49,6 +52,7 @@ class WaitlistAgent(BaseAgent):
         )
 
     def _reply(self, request, performative, content):
+
         return self.send_message(
             receiver=request.sender,
             performative=performative,
@@ -56,25 +60,35 @@ class WaitlistAgent(BaseAgent):
             conversation_id=request.conversation_id
         )
 
+    # Validate waitlist registration.
     def _validate_join_request(self, content):
+
         try:
             user_id = int(content.get("user_id"))
             event_id = int(content.get("event_id"))
             quantity = int(content.get("quantity"))
+
         except (TypeError, ValueError):
-            raise ValueError("Valid user_id, event_id and quantity are required.")
+            raise ValueError(
+                "Valid user_id, event_id and quantity are required."
+            )
 
         if user_id <= 0 or event_id <= 0:
             raise ValueError("User ID and event ID must be positive.")
 
         if quantity < 1 or quantity > 10:
-            raise ValueError("Waitlist quantity must be between 1 and 10.")
+            raise ValueError(
+                "Waitlist quantity must be between 1 and 10."
+            )
 
         return user_id, event_id, quantity
 
+    # Validate event ID.
     def _validate_event_id(self, content):
+
         try:
             event_id = int(content.get("event_id"))
+
         except (TypeError, ValueError):
             raise ValueError("A valid event_id is required.")
 
@@ -83,13 +97,16 @@ class WaitlistAgent(BaseAgent):
 
         return event_id
 
+    # Join waitlist.
     def join_waitlist(self, message):
+
         try:
             user_id, event_id, quantity = self._validate_join_request(
                 message.content
             )
 
             with get_db_connection() as connection:
+
                 with connection.cursor() as cursor:
 
                     cursor.execute("""
@@ -104,7 +121,9 @@ class WaitlistAgent(BaseAgent):
                         return self._reply(
                             message,
                             Performative.REFUSE,
-                            {"reason": "Active attendee account not found."}
+                            {
+                                "reason": "Active attendee account not found."
+                            }
                         )
 
                     cursor.execute("""
@@ -133,12 +152,20 @@ class WaitlistAgent(BaseAgent):
                         return self._reply(
                             message,
                             Performative.REFUSE,
-                            {"reason": "You are already on this event's waitlist."}
+                            {
+                                "reason": (
+                                    "You are already on this event's waitlist."
+                                )
+                            }
                         )
 
                     cursor.execute("""
                         INSERT INTO waitlist (
-                            user_id, event_id, quantity, status, created_at
+                            user_id,
+                            event_id,
+                            quantity,
+                            status,
+                            created_at
                         )
                         VALUES (%s, %s, %s, 'WAITING', NOW())
                         RETURNING id, created_at
@@ -152,6 +179,7 @@ class WaitlistAgent(BaseAgent):
                 "event_id": event_id,
                 "quantity": quantity
             }
+
             self.save_state()
 
             return self._reply(
@@ -168,18 +196,23 @@ class WaitlistAgent(BaseAgent):
             )
 
         except (KeyError, TypeError, ValueError) as error:
+
             return self._reply(
                 message,
                 Performative.REFUSE,
                 {"reason": str(error)}
             )
 
+    # Process waitlist when tickets become available.
     def process_waitlist(self, message):
+
         try:
             event_id = self._validate_event_id(message.content)
+
             processed = []
 
             with get_db_connection() as connection:
+
                 with connection.cursor() as cursor:
 
                     cursor.execute("""
@@ -194,7 +227,7 @@ class WaitlistAgent(BaseAgent):
                     waiting_entries = cursor.fetchall()
 
                     for entry in waiting_entries:
-                        # Find a ticket category with enough available tickets.
+
                         cursor.execute("""
                             SELECT
                                 tc.id AS category_id,
@@ -220,7 +253,7 @@ class WaitlistAgent(BaseAgent):
                         if not category:
                             continue
 
-                        # Ask BookingAgent to complete the booking.
+                        # Send ACL REQUEST to BookingAgent.
                         booking_message = ACLMessage(
                             sender=self.name,
                             receiver="BookingAgent",
@@ -241,6 +274,7 @@ class WaitlistAgent(BaseAgent):
                             response
                             and response.performative == Performative.AGREE
                         ):
+
                             cursor.execute("""
                                 UPDATE waitlist
                                 SET status = 'FULFILLED'
@@ -258,6 +292,7 @@ class WaitlistAgent(BaseAgent):
                 "event_id": event_id,
                 "processed_count": len(processed)
             }
+
             self.save_state()
 
             return self._reply(
@@ -272,20 +307,26 @@ class WaitlistAgent(BaseAgent):
             )
 
         except (KeyError, TypeError, ValueError) as error:
+
             return self._reply(
                 message,
                 Performative.REFUSE,
                 {"reason": str(error)}
             )
 
+    # Automatically expire old waitlist entries.
     def expire_waitlist(self, message):
+
         try:
-            expiry_date = datetime.now(timezone.utc) - timedelta(
-                days=self.EXPIRY_DAYS
+            expiry_date = (
+                datetime.now(timezone.utc)
+                - timedelta(days=self.EXPIRY_DAYS)
             )
 
             with get_db_connection() as connection:
+
                 with connection.cursor() as cursor:
+
                     cursor.execute("""
                         UPDATE waitlist
                         SET status = 'EXPIRED'
@@ -302,6 +343,7 @@ class WaitlistAgent(BaseAgent):
                 "expired_count": expired_count,
                 "checked_at": datetime.now(timezone.utc).isoformat()
             }
+
             self.save_state()
 
             return self._reply(
@@ -313,7 +355,8 @@ class WaitlistAgent(BaseAgent):
                 }
             )
 
-        except (KeyError, TypeError, ValueError) as error:
+        except Exception as error:
+
             return self._reply(
                 message,
                 Performative.FAILURE,

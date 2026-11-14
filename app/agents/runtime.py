@@ -1,4 +1,3 @@
-
 from app.agents.message_bus import MessageBus
 
 from app.agents.venue_agent import VenueAgent
@@ -15,46 +14,28 @@ def create_agent_runtime():
     message_bus = MessageBus()
 
     # Create all five agents.
-    venue_agent = VenueAgent(
-        "VenueAgent",
-        message_bus
-    )
+    venue_agent = VenueAgent("VenueAgent", message_bus)
+    booking_agent = BookingAgent("BookingAgent", message_bus)
+    ticket_agent = TicketAgent("TicketAgent", message_bus)
+    waitlist_agent = WaitlistAgent("WaitlistAgent", message_bus)
+    notification_agent = NotificationAgent("NotificationAgent", message_bus)
 
-    booking_agent = BookingAgent(
-        "BookingAgent",
-        message_bus
-    )
-
-    ticket_agent = TicketAgent(
-        "TicketAgent",
-        message_bus
-    )
-
-    waitlist_agent = WaitlistAgent(
-        "WaitlistAgent",
-        message_bus
-    )
-
-    notification_agent = NotificationAgent(
-        "NotificationAgent",
-        message_bus
-    )
-
-    # Create separate API gateways.
+    # Create API gateways.
     booking_api_gateway = APIGatewayAgent("BookingAPI")
-
     ticket_api_gateway = APIGatewayAgent("TicketAPI")
+    waitlist_scheduler_gateway = APIGatewayAgent("WaitlistScheduler")
 
-    # Register each agent exactly once.
+    # Register agents exactly once.
     message_bus.register(venue_agent)
     message_bus.register(booking_agent)
     message_bus.register(ticket_agent)
     message_bus.register(waitlist_agent)
     message_bus.register(notification_agent)
 
-    # Register each gateway exactly once.
+    # Register gateways exactly once.
     message_bus.register(booking_api_gateway)
     message_bus.register(ticket_api_gateway)
+    message_bus.register(waitlist_scheduler_gateway)
 
     return {
         "message_bus": message_bus,
@@ -67,5 +48,6 @@ def create_agent_runtime():
 
         "api_gateway": booking_api_gateway,
         "booking_api_gateway": booking_api_gateway,
-        "ticket_api_gateway": ticket_api_gateway
+        "ticket_api_gateway": ticket_api_gateway,
+        "waitlist_scheduler_gateway": waitlist_scheduler_gateway
     }
