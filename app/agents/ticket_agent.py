@@ -11,13 +11,19 @@ class TicketAgent(BaseAgent):
     Validates digital tickets and manages one-time event check-in.
     """
 
+    # -------------------------------------------------
+    # RECEIVE ACL MESSAGE
+    # -------------------------------------------------
+
     def receive_message(self, message: ACLMessage):
 
         if message.performative != Performative.REQUEST:
             return self._reply(
                 message,
                 Performative.REFUSE,
-                {"reason": "TicketAgent only accepts REQUEST messages."}
+                {
+                    "reason": "TicketAgent only accepts REQUEST messages."
+                }
             )
 
         action = message.content.get("action")
@@ -28,7 +34,9 @@ class TicketAgent(BaseAgent):
         return self._reply(
             message,
             Performative.REFUSE,
-            {"reason": f"Unsupported action: {action}"}
+            {
+                "reason": f"Unsupported action: {action}"
+            }
         )
 
     # -------------------------------------------------
@@ -36,6 +44,7 @@ class TicketAgent(BaseAgent):
     # -------------------------------------------------
 
     def _reply(self, request, performative, content):
+
         return self.send_message(
             receiver=request.sender,
             performative=performative,
@@ -62,6 +71,7 @@ class TicketAgent(BaseAgent):
 
         try:
             staff_user_id = int(staff_user_id)
+
         except (TypeError, ValueError):
             raise ValueError("A valid staff user ID is required.")
 
@@ -77,6 +87,7 @@ class TicketAgent(BaseAgent):
     def check_in(self, message):
 
         try:
+
             qr_token, staff_user_id = self._validate_request(
                 message.content
             )
@@ -85,7 +96,7 @@ class TicketAgent(BaseAgent):
 
                 with connection.cursor() as cursor:
 
-                    # Verify the staff member's role.
+                    # Verify active staff member.
                     cursor.execute(
                         """
                         SELECT id, role
@@ -100,6 +111,7 @@ class TicketAgent(BaseAgent):
                     staff = cursor.fetchone()
 
                     if not staff:
+
                         return self._reply(
                             message,
                             Performative.REFUSE,
@@ -111,7 +123,7 @@ class TicketAgent(BaseAgent):
                             }
                         )
 
-                    # Lock the ticket row to prevent double check-in.
+                    # Lock ticket row to prevent double check-in.
                     cursor.execute(
                         """
                         SELECT
@@ -121,13 +133,22 @@ class TicketAgent(BaseAgent):
                             e.id AS event_id,
                             e.title AS event_title,
                             e.status AS event_status,
-                            b.status AS booking_status
+                            b.status AS booking_status,
+                            tc.category_name
+
                         FROM tickets t
+
                         JOIN bookings b
                             ON b.id = t.booking_id
+
                         JOIN events e
                             ON e.id = b.event_id
+
+                        JOIN ticket_categories tc
+                            ON tc.id = t.category_id
+
                         WHERE t.qr_token = %s
+
                         FOR UPDATE OF t
                         """,
                         (qr_token,)
@@ -135,35 +156,50 @@ class TicketAgent(BaseAgent):
 
                     ticket = cursor.fetchone()
 
+                    # Ticket not found.
                     if not ticket:
-                        return self._reply(
-                            message,
-                            Performative.REFUSE,
-                            {"reason": "Invalid QR ticket. Ticket not found."}
-                        )
 
-                    # Reject tickets already used.
-                    if ticket["ticket_status"] == "USED":
                         return self._reply(
                             message,
                             Performative.REFUSE,
                             {
-                                "reason": "Ticket has already been used.",
+                                "reason": (
+                                    "Invalid QR ticket. "
+                                    "Ticket not found."
+                                )
+                            }
+                        )
+
+                    # Already used ticket.
+                    if ticket["ticket_status"] == "USED":
+
+                        return self._reply(
+                            message,
+                            Performative.REFUSE,
+                            {
+                                "reason": (
+                                    "Ticket has already been used."
+                                ),
                                 "ticket_id": ticket["ticket_id"]
                             }
                         )
 
-                    # Reject cancelled tickets.
+                    # Cancelled ticket.
                     if ticket["ticket_status"] == "CANCELLED":
+
                         return self._reply(
                             message,
                             Performative.REFUSE,
                             {
-                                "reason": "This ticket has been cancelled."
+                                "reason": (
+                                    "This ticket has been cancelled."
+                                )
                             }
                         )
 
+                    # Invalid ticket status.
                     if ticket["ticket_status"] != "VALID":
+
                         return self._reply(
                             message,
                             Performative.REFUSE,
@@ -172,8 +208,9 @@ class TicketAgent(BaseAgent):
                             }
                         )
 
-                    # Reject tickets from cancelled bookings.
+                    # Booking must be confirmed.
                     if ticket["booking_status"] != "CONFIRMED":
+
                         return self._reply(
                             message,
                             Performative.REFUSE,
@@ -182,25 +219,32 @@ class TicketAgent(BaseAgent):
                             }
                         )
 
-                    # Reject tickets from cancelled events.
+                    # Event must not be cancelled.
                     if ticket["event_status"] == "CANCELLED":
+
                         return self._reply(
                             message,
                             Performative.REFUSE,
                             {
-                                "reason": "This event has been cancelled."
+                                "reason": (
+                                    "This event has been cancelled."
+                                )
                             }
                         )
 
-                    # Mark ticket as used.
+                    # Update ticket status.
                     cursor.execute(
                         """
                         UPDATE tickets
-                        SET status = 'USED',
+
+                        SET
+                            status = 'USED',
                             checked_in_at = NOW(),
                             checked_in_by = %s
+
                         WHERE id = %s
                           AND status = 'VALID'
+
                         RETURNING id, checked_in_at
                         """,
                         (
@@ -212,6 +256,7 @@ class TicketAgent(BaseAgent):
                     checked_ticket = cursor.fetchone()
 
                     if not checked_ticket:
+
                         return self._reply(
                             message,
                             Performative.REFUSE,
@@ -223,18 +268,29 @@ class TicketAgent(BaseAgent):
                             }
                         )
 
-            # Save persistent agent state.
+            # -----------------------------------------
+            # SAVE AGENT STATE
+            # -----------------------------------------
+
+            checked_in_at = (
+                checked_ticket["checked_in_at"].isoformat()
+                if checked_ticket["checked_in_at"]
+                else None
+            )
+
             self.state["last_check_in"] = {
                 "ticket_id": ticket["ticket_id"],
                 "event_id": ticket["event_id"],
                 "staff_user_id": staff_user_id,
                 "status": "SUCCESS",
-                "checked_in_at": (
-                    checked_ticket["checked_in_at"].isoformat()
-                )
+                "checked_in_at": checked_in_at
             }
 
             self.save_state()
+
+            # -----------------------------------------
+            # SEND SUCCESS RESPONSE
+            # -----------------------------------------
 
             return self._reply(
                 message,
@@ -245,11 +301,10 @@ class TicketAgent(BaseAgent):
                     "ticket_id": ticket["ticket_id"],
                     "event_id": ticket["event_id"],
                     "event_title": ticket["event_title"],
+                    "category": ticket["category_name"],
                     "ticket_status": "USED",
                     "checked_in_by": staff_user_id,
-                    "checked_in_at": (
-                        checked_ticket["checked_in_at"].isoformat()
-                    )
+                    "checked_in_at": checked_in_at
                 }
             )
 
@@ -258,5 +313,7 @@ class TicketAgent(BaseAgent):
             return self._reply(
                 message,
                 Performative.REFUSE,
-                {"reason": str(error)}
+                {
+                    "reason": str(error)
+                }
             )

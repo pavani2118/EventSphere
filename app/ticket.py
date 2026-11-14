@@ -1,12 +1,14 @@
+
 import io
 import qrcode
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from app.database import get_db_connection
 from app.dependencies import require_roles
 from app.ticket_schemas import CheckInRequest
+from app.agents.message import ACLMessage, Performative
 
 
 router = APIRouter(
@@ -15,12 +17,17 @@ router = APIRouter(
 )
 
 
-# 1. Get tickets belonging to the logged-in attendee
+# -------------------------------------------------
+# 1. GET MY TICKETS
+# -------------------------------------------------
+
 @router.get("/my-tickets")
 def get_my_tickets(
     current_user=Depends(require_roles("ATTENDEE"))
 ):
+
     with get_db_connection() as connection:
+
         with connection.cursor() as cursor:
 
             cursor.execute(
@@ -65,18 +72,24 @@ def get_my_tickets(
     }
 
 
-# 2. Generate QR code image for an attendee's ticket
+# -------------------------------------------------
+# 2. GENERATE TICKET QR CODE
+# -------------------------------------------------
+
 @router.get("/{ticket_id}/qr")
 def generate_ticket_qr(
     ticket_id: int,
     current_user=Depends(require_roles("ATTENDEE"))
 ):
+
     with get_db_connection() as connection:
+
         with connection.cursor() as cursor:
 
             cursor.execute(
                 """
                 SELECT t.qr_token
+
                 FROM tickets t
 
                 JOIN bookings b
@@ -91,6 +104,7 @@ def generate_ticket_qr(
             ticket = cursor.fetchone()
 
     if ticket is None:
+
         raise HTTPException(
             status_code=404,
             detail="Ticket not found"
@@ -99,7 +113,9 @@ def generate_ticket_qr(
     qr = qrcode.make(ticket["qr_token"])
 
     image_buffer = io.BytesIO()
+
     qr.save(image_buffer, format="PNG")
+
     image_buffer.seek(0)
 
     return StreamingResponse(
@@ -112,108 +128,94 @@ def generate_ticket_qr(
     )
 
 
-# 3. Validate QR token and check in attendee
+# -------------------------------------------------
+# 3. CHECK-IN THROUGH TICKET AGENT
+# -------------------------------------------------
+
 @router.post("/check-in")
 def check_in_ticket(
     data: CheckInRequest,
+    request: Request,
     current_user=Depends(
         require_roles("GATE_STAFF", "ADMIN")
     )
 ):
-    with get_db_connection() as connection:
-        with connection.cursor() as cursor:
 
-            # Lock ticket row to prevent double check-in
-            cursor.execute(
-                """
-                SELECT
-                    t.id,
-                    t.status,
-                    t.qr_token,
-                    e.status AS event_status,
-                    e.title AS event_title,
-                    tc.category_name
+    # Get agent runtime.
+    runtime = request.app.state.agent_runtime
 
-                FROM tickets t
+    message_bus = runtime["message_bus"]
 
-                JOIN bookings b
-                    ON t.booking_id = b.id
+    # Validate and clean QR token.
+    qr_token = data.qr_token.strip()
 
-                JOIN events e
-                    ON b.event_id = e.id
+    # Create ACL REQUEST.
+    checkin_request = ACLMessage(
+        sender="TicketAPI",
+        receiver="TicketAgent",
+        performative=Performative.REQUEST,
+        content={
+            "action": "CHECK_IN",
+            "qr_token": qr_token,
+            "staff_user_id": current_user["id"]
+        }
+    )
 
-                JOIN ticket_categories tc
-                    ON t.category_id = tc.id
+    # Send request to TicketAgent.
+    response = message_bus.send(checkin_request)
 
-                WHERE t.qr_token = %s
+    # ---------------------------------------------
+    # HANDLE REFUSAL
+    # ---------------------------------------------
 
-                FOR UPDATE OF t
-                """,
-                (data.qr_token,)
+    if response.performative == Performative.REFUSE:
+
+        reason = response.content.get(
+            "reason",
+            "Ticket check-in was rejected."
+        )
+
+        reason_lower = reason.lower()
+
+        if (
+            "not found" in reason_lower
+            or "invalid qr" in reason_lower
+        ):
+            status_code = 404
+
+        elif (
+            "already" in reason_lower
+            or "used" in reason_lower
+        ):
+            status_code = 409
+
+        else:
+            status_code = 400
+
+        raise HTTPException(
+            status_code=status_code,
+            detail=reason
+        )
+
+    # ---------------------------------------------
+    # HANDLE UNEXPECTED RESPONSE
+    # ---------------------------------------------
+
+    if response.performative != Performative.AGREE:
+
+        raise HTTPException(
+            status_code=500,
+            detail=response.content.get(
+                "reason",
+                "TicketAgent could not complete check-in."
             )
+        )
 
-            ticket = cursor.fetchone()
-
-            if ticket is None:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Invalid QR code. Ticket not found."
-                )
-
-            if ticket["status"] == "USED":
-                raise HTTPException(
-                    status_code=409,
-                    detail="Ticket has already been used."
-                )
-
-            if ticket["status"] == "CANCELLED":
-                raise HTTPException(
-                    status_code=400,
-                    detail="This ticket has been cancelled."
-                )
-
-            if ticket["status"] != "VALID":
-                raise HTTPException(
-                    status_code=400,
-                    detail="Ticket is not valid."
-                )
-
-            if ticket["event_status"] == "CANCELLED":
-                raise HTTPException(
-                    status_code=400,
-                    detail="This event has been cancelled."
-                )
-
-            cursor.execute(
-                """
-                UPDATE tickets
-
-                SET
-                    status = 'USED',
-                    checked_in_at = NOW(),
-                    checked_in_by = %s
-
-                WHERE id = %s
-                  AND status = 'VALID'
-
-                RETURNING id, status, checked_in_at
-                """,
-                (current_user["id"], ticket["id"])
-            )
-
-            checked_ticket = cursor.fetchone()
-
-            if checked_ticket is None:
-                raise HTTPException(
-                    status_code=409,
-                    detail="Ticket has already been checked in."
-                )
+    # ---------------------------------------------
+    # SUCCESS RESPONSE
+    # ---------------------------------------------
 
     return {
         "message": "Check-in successful",
-        "ticket_id": checked_ticket["id"],
-        "event_title": ticket["event_title"],
-        "category": ticket["category_name"],
-        "ticket_status": checked_ticket["status"],
-        "checked_in_at": checked_ticket["checked_in_at"]
+        **response.content
     }
