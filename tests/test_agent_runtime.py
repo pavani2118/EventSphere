@@ -4,6 +4,8 @@ from app.agents.runtime import create_agent_runtime
 from app.agents.venue_agent import VenueAgent
 from app.agents.waitlist_agent import WaitlistAgent
 from app.agents.ticket_agent import TicketAgent
+from app.agents.notification_agent import NotificationAgent
+from app.agents.api_gateway import APIGatewayAgent
 def test_runtime_creates_message_bus():
     runtime = create_agent_runtime()
 
@@ -19,7 +21,15 @@ def test_runtime_registers_venue_agent():
         VenueAgent
     )
 
+def test_runtime_registers_notification_agent():
+    runtime = create_agent_runtime()
 
+    assert "NotificationAgent" in runtime["message_bus"].agents
+
+    assert isinstance(
+        runtime["message_bus"].agents["NotificationAgent"],
+        NotificationAgent
+    )
 def test_runtime_returns_registered_agent():
     runtime = create_agent_runtime()
 
@@ -53,4 +63,14 @@ def test_runtime_registers_waitlist_agent():
     assert isinstance(
         runtime["message_bus"].agents["WaitlistAgent"],
         WaitlistAgent
+    )
+
+def test_runtime_registers_api_gateway():
+    runtime = create_agent_runtime()
+
+    assert "BookingAPI" in runtime["message_bus"].agents
+
+    assert isinstance(
+        runtime["message_bus"].agents["BookingAPI"],
+        APIGatewayAgent
     )

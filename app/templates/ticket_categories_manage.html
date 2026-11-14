@@ -1,0 +1,94 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Manage Ticket Categories | EventSphere</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-dark bg-dark">
+    <div class="container">
+        <a class="navbar-brand" href="/ui/admin">EventSphere Admin</a>
+        <div class="d-flex gap-2">
+            <a href="/ui/manage-events" class="btn btn-outline-light btn-sm">
+                Manage Events
+            </a>
+            <button class="btn btn-danger btn-sm" onclick="logout()">
+                Logout
+            </button>
+        </div>
+    </div>
+</nav>
+
+<div class="container py-4">
+
+    <div class="mb-4">
+        <h2>Manage Ticket Categories</h2>
+        <p class="text-muted">Add and manage ticket categories for your event.</p>
+    </div>
+
+    <div id="message" class="alert d-none"></div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 id="eventTitle">Loading event...</h5>
+            <p class="mb-1">
+                Event Status:
+                <strong id="eventStatus">-</strong>
+            </p>
+            <p class="mb-0">
+                Venue Capacity:
+                <strong id="venueCapacity">-</strong>
+            </p>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <h5 class="mb-3">Existing Ticket Categories</h5>
+            <div id="existingCategories">
+                <p class="text-muted">Loading categories...</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card shadow-sm mb-4" id="categoryForm">
+        <div class="card-body">
+            <h5 class="mb-3">Add New Ticket Categories</h5>
+
+            <form id="categoryFormInner">
+                <div id="categoryRows"></div>
+
+                <p id="totalQuantity" class="fw-semibold mb-3">
+                    Existing: 0 | New: 0 | Remaining capacity: 0
+                </p>
+
+                <div class="d-flex flex-wrap gap-2">
+                    <button type="button" id="addCategoryButton"
+                            class="btn btn-outline-primary">
+                        + Add Another Category
+                    </button>
+
+                    <button type="submit" id="saveCategoriesButton"
+                            class="btn btn-primary">
+                        Save New Categories
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <a href="/ui/manage-events" class="btn btn-secondary">
+        Back to Manage Events
+    </a>
+
+</div>
+
+<script src="/static/js/ticket-categories-manage.js"></script>
+
+</body>
+</html>

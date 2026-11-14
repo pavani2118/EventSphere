@@ -14,8 +14,6 @@ router = APIRouter(
     tags=["Event Management"]
 )
 
-
-# Venue turnaround buffer: 60 minutes
 TURNAROUND_BUFFER_MINUTES = 60
 
 
@@ -31,7 +29,6 @@ def create_event(
     with get_db_connection() as connection:
         with connection.cursor() as cursor:
 
-            # Lock venue to prevent simultaneous booking conflicts
             cursor.execute(
                 """
                 SELECT id, capacity
@@ -45,15 +42,9 @@ def create_event(
             venue = cursor.fetchone()
 
             if venue is None:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Venue not found"
-                )
+                raise HTTPException(status_code=404, detail="Venue not found")
 
-            # Check venue time conflicts
-            buffer = timedelta(
-                minutes=TURNAROUND_BUFFER_MINUTES
-            )
+            buffer = timedelta(minutes=TURNAROUND_BUFFER_MINUTES)
 
             cursor.execute(
                 """
@@ -83,18 +74,11 @@ def create_event(
                     }
                 )
 
-            # Create event as DRAFT
             cursor.execute(
                 """
                 INSERT INTO events (
-                    title,
-                    category,
-                    venue_id,
-                    start_time,
-                    end_time,
-                    description,
-                    status,
-                    created_by
+                    title, category, venue_id, start_time,
+                    end_time, description, status, created_by
                 )
                 VALUES (%s, %s, %s, %s, %s, %s, 'DRAFT', %s)
                 RETURNING *
@@ -119,7 +103,7 @@ def create_event(
 
 
 # --------------------------------------------------
-# VIEW ALL PUBLISHED EVENTS
+# VIEW ALL PUBLISHED EVENTS (PUBLIC)
 # --------------------------------------------------
 
 @router.get("/")
@@ -151,9 +135,7 @@ def get_all_events(
 
     with get_db_connection() as connection:
         with connection.cursor() as cursor:
-
             cursor.execute(query, params)
-
             events = cursor.fetchall()
 
     return {
@@ -163,11 +145,314 @@ def get_all_events(
 
 
 # --------------------------------------------------
+# VIEW ALL EVENTS FOR ADMIN / ORGANISER
+# Includes DRAFT, PUBLISHED and CANCELLED
+# --------------------------------------------------
+
+@router.get("/manage/all")
+def get_all_events_for_management(
+    current_user=Depends(require_roles("ADMIN", "ORGANISER"))
+):
+    with get_db_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    e.*,
+                    v.name AS venue_name,
+                    v.location AS venue_location
+                FROM events e
+                LEFT JOIN venues v ON e.venue_id = v.id
+                ORDER BY e.created_at DESC
+                """
+            )
+
+            events = cursor.fetchall()
+
+    return {
+        "total": len(events),
+        "events": events
+    }
+
+@router.get("/manage/{event_id}/ticket-categories")
+def get_management_ticket_categories(
+    event_id: int,
+    current_user=Depends(require_roles("ADMIN", "ORGANISER"))
+):
+    with get_db_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                SELECT e.id, e.title, e.status, e.created_by,
+                       v.capacity AS venue_capacity
+                FROM events e
+                JOIN venues v ON v.id = e.venue_id
+                WHERE e.id = %s
+            """, (event_id,))
+
+            event = cursor.fetchone()
+
+            if event is None:
+                raise HTTPException(status_code=404, detail="Event not found")
+
+            if (
+                current_user["role"] != "ADMIN"
+                and event["created_by"] != current_user["id"]
+            ):
+                raise HTTPException(
+                    status_code=403,
+                    detail="You do not have permission to manage this event"
+                )
+
+            cursor.execute("""
+                SELECT
+                    tc.id,
+                    tc.event_id,
+                    tc.category_name,
+                    tc.price,
+                    tc.quantity,
+                    COALESCE(s.sold_count, 0) AS sold_count,
+                    GREATEST(
+                        tc.quantity - COALESCE(s.sold_count, 0), 0
+                    ) AS available_quantity
+                FROM ticket_categories tc
+                LEFT JOIN (
+                    SELECT category_id, COUNT(*) AS sold_count
+                    FROM tickets
+                    WHERE status IN ('VALID', 'USED')
+                    GROUP BY category_id
+                ) s ON s.category_id = tc.id
+                WHERE tc.event_id = %s
+                ORDER BY tc.id
+            """, (event_id,))
+
+            categories = cursor.fetchall()
+
+    return {
+        "event": event,
+        "categories": categories,
+        "total_categories": len(categories)
+    }
+
+
+@router.post("/{event_id}/ticket-categories")
+def add_ticket_categories(
+    event_id: int,
+    data: TicketCategoriesCreate,
+    current_user=Depends(require_roles("ADMIN", "ORGANISER"))
+):
+    if not data.categories:
+        raise HTTPException(
+            status_code=400,
+            detail="Please add at least one ticket category"
+        )
+
+    # Check duplicate names inside the submitted request
+    submitted_names = [
+        item.category_name.strip().casefold()
+        for item in data.categories
+    ]
+
+    if len(submitted_names) != len(set(submitted_names)):
+        raise HTTPException(
+            status_code=400,
+            detail="Duplicate category names are not allowed"
+        )
+
+    with get_db_connection() as connection:
+        with connection.cursor() as cursor:
+
+            # Lock the event while checking and adding categories
+            cursor.execute("""
+                SELECT e.id, e.title, e.status, e.created_by,
+                       v.capacity AS venue_capacity
+                FROM events e
+                JOIN venues v ON v.id = e.venue_id
+                WHERE e.id = %s
+                FOR UPDATE OF e
+            """, (event_id,))
+
+            event = cursor.fetchone()
+
+            if event is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Event not found"
+                )
+
+            if (
+                current_user["role"] != "ADMIN"
+                and event["created_by"] != current_user["id"]
+            ):
+                raise HTTPException(
+                    status_code=403,
+                    detail="You do not have permission to manage this event"
+                )
+
+            if event["status"] != "DRAFT":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Ticket categories can only be added to draft events"
+                )
+
+            # Read existing categories
+            cursor.execute("""
+                SELECT category_name, quantity
+                FROM ticket_categories
+                WHERE event_id = %s
+            """, (event_id,))
+
+            existing_categories = cursor.fetchall()
+
+            existing_names = {
+                item["category_name"].strip().casefold()
+                for item in existing_categories
+            }
+
+            # Prevent duplicate names with previously saved categories
+            duplicate_names = [
+                item.category_name.strip()
+                for item in data.categories
+                if item.category_name.strip().casefold() in existing_names
+            ]
+
+            if duplicate_names:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "These ticket categories already exist: "
+                        + ", ".join(duplicate_names)
+                    )
+                )
+
+            existing_quantity = sum(
+                int(item["quantity"]) for item in existing_categories
+            )
+
+            new_quantity = sum(
+                int(item.quantity) for item in data.categories
+            )
+
+            total_quantity = existing_quantity + new_quantity
+
+            if total_quantity > event["venue_capacity"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Total ticket quantity ({total_quantity}) exceeds "
+                        f"venue capacity ({event['venue_capacity']}). "
+                        f"Remaining capacity: "
+                        f"{event['venue_capacity'] - existing_quantity}"
+                    )
+                )
+
+            created_categories = []
+
+            for item in data.categories:
+                category_name = item.category_name.strip()
+
+                if not category_name:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Category name cannot be empty"
+                    )
+
+                if item.price < 0 or item.quantity <= 0:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Price must be zero or more and quantity must be positive"
+                    )
+
+                cursor.execute("""
+                    INSERT INTO ticket_categories
+                        (event_id, category_name, price, quantity)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING id, event_id, category_name, price, quantity
+                """, (
+                    event_id,
+                    category_name,
+                    item.price,
+                    item.quantity
+                ))
+
+                created_categories.append(cursor.fetchone())
+
+    return {
+        "message": "Ticket categories added successfully",
+        "event_id": event_id,
+        "added_count": len(created_categories),
+        "total_category_quantity": total_quantity,
+        "venue_capacity": event["venue_capacity"],
+        "categories": created_categories
+    }
+# --------------------------------------------------
+# VIEW TICKET CATEGORIES FOR A PUBLISHED EVENT
+# --------------------------------------------------
+
+@router.get("/{event_id}/ticket-categories")
+def get_event_ticket_categories(event_id: int):
+
+    with get_db_connection() as connection:
+        with connection.cursor() as cursor:
+
+            cursor.execute(
+                """
+                SELECT id
+                FROM events
+                WHERE id = %s AND status = 'PUBLISHED'
+                """,
+                (event_id,)
+            )
+
+            event = cursor.fetchone()
+
+            if event is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Published event not found"
+                )
+
+            cursor.execute(
+                """
+                SELECT
+                    tc.id,
+                    tc.event_id,
+                    tc.category_name,
+                    tc.price,
+                    tc.quantity,
+                    COALESCE(s.sold_count, 0) AS sold_count,
+                    GREATEST(
+                        tc.quantity - COALESCE(s.sold_count, 0),
+                        0
+                    ) AS available_quantity
+                FROM ticket_categories tc
+                LEFT JOIN (
+                    SELECT category_id, COUNT(*) AS sold_count
+                    FROM tickets
+                    WHERE status IN ('VALID', 'USED')
+                    GROUP BY category_id
+                ) s ON s.category_id = tc.id
+                WHERE tc.event_id = %s
+                ORDER BY tc.price ASC
+                """,
+                (event_id,)
+            )
+
+            categories = cursor.fetchall()
+
+    return {
+        "event_id": event_id,
+        "total_categories": len(categories),
+        "categories": categories
+    }
+
+
+# --------------------------------------------------
 # VIEW SINGLE PUBLISHED EVENT
 # --------------------------------------------------
 
 @router.get("/{event_id}")
 def get_event(event_id: int):
+
     with get_db_connection() as connection:
         with connection.cursor() as cursor:
 
@@ -200,18 +485,13 @@ def get_event(event_id: int):
 # CREATE TICKET CATEGORIES
 # --------------------------------------------------
 
-@router.post(
-    "/{event_id}/ticket-categories",
-    status_code=201
-)
+@router.post("/{event_id}/ticket-categories", status_code=201)
 def create_ticket_categories(
     event_id: int,
     data: TicketCategoriesCreate,
-    current_user=Depends(
-        require_roles("ADMIN", "ORGANISER")
-    )
+    current_user=Depends(require_roles("ADMIN", "ORGANISER"))
 ):
-    # Check duplicate category names
+
     category_names = [
         category.category_name.strip().lower()
         for category in data.categories
@@ -223,16 +503,13 @@ def create_ticket_categories(
             detail="Duplicate ticket category names are not allowed"
         )
 
-    # Calculate total ticket quantity
     total_quantity = sum(
-        category.quantity
-        for category in data.categories
+        category.quantity for category in data.categories
     )
 
     with get_db_connection() as connection:
         with connection.cursor() as cursor:
 
-            # Find and lock event
             cursor.execute(
                 """
                 SELECT id, venue_id, status, created_by
@@ -246,12 +523,8 @@ def create_ticket_categories(
             event = cursor.fetchone()
 
             if event is None:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Event not found"
-                )
+                raise HTTPException(status_code=404, detail="Event not found")
 
-            # Check event ownership
             if (
                 current_user["role"] != "ADMIN"
                 and event["created_by"] != current_user["id"]
@@ -261,14 +534,12 @@ def create_ticket_categories(
                     detail="You cannot manage this event"
                 )
 
-            # Only draft events can receive categories
             if event["status"] != "DRAFT":
                 raise HTTPException(
                     status_code=400,
                     detail="Ticket categories can only be added to draft events"
                 )
 
-            # Lock venue and get capacity
             cursor.execute(
                 """
                 SELECT id, capacity
@@ -282,12 +553,8 @@ def create_ticket_categories(
             venue = cursor.fetchone()
 
             if venue is None:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Venue not found"
-                )
+                raise HTTPException(status_code=404, detail="Venue not found")
 
-            # Validate venue capacity
             if total_quantity > venue["capacity"]:
                 raise HTTPException(
                     status_code=400,
@@ -298,7 +565,6 @@ def create_ticket_categories(
                     }
                 )
 
-            # Check existing categories
             cursor.execute(
                 """
                 SELECT COUNT(*) AS category_count
@@ -316,17 +582,13 @@ def create_ticket_categories(
                     detail="Ticket categories already exist for this event"
                 )
 
-            # Insert ticket categories
             created_categories = []
 
             for category in data.categories:
                 cursor.execute(
                     """
                     INSERT INTO ticket_categories (
-                        event_id,
-                        category_name,
-                        price,
-                        quantity
+                        event_id, category_name, price, quantity
                     )
                     VALUES (%s, %s, %s, %s)
                     RETURNING *
@@ -339,9 +601,7 @@ def create_ticket_categories(
                     )
                 )
 
-                created_categories.append(
-                    cursor.fetchone()
-                )
+                created_categories.append(cursor.fetchone())
 
     return {
         "message": "Ticket categories created successfully",
@@ -360,14 +620,12 @@ def create_ticket_categories(
 def update_event(
     event_id: int,
     event: EventUpdate,
-    current_user=Depends(
-        require_roles("ADMIN", "ORGANISER")
-    )
+    current_user=Depends(require_roles("ADMIN", "ORGANISER"))
 ):
+
     with get_db_connection() as connection:
         with connection.cursor() as cursor:
 
-            # Find and lock event
             cursor.execute(
                 """
                 SELECT id, status, created_by
@@ -381,12 +639,8 @@ def update_event(
             existing_event = cursor.fetchone()
 
             if existing_event is None:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Event not found"
-                )
+                raise HTTPException(status_code=404, detail="Event not found")
 
-            # Check ownership
             if (
                 current_user["role"] != "ADMIN"
                 and existing_event["created_by"] != current_user["id"]
@@ -396,14 +650,12 @@ def update_event(
                     detail="You cannot manage this event"
                 )
 
-            # Only draft events can be updated
             if existing_event["status"] != "DRAFT":
                 raise HTTPException(
                     status_code=400,
                     detail="Only draft events can be updated"
                 )
 
-            # Lock the selected venue
             cursor.execute(
                 """
                 SELECT id
@@ -417,15 +669,9 @@ def update_event(
             venue = cursor.fetchone()
 
             if venue is None:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Venue not found"
-                )
+                raise HTTPException(status_code=404, detail="Venue not found")
 
-            # Check venue time conflicts
-            buffer = timedelta(
-                minutes=TURNAROUND_BUFFER_MINUTES
-            )
+            buffer = timedelta(minutes=TURNAROUND_BUFFER_MINUTES)
 
             cursor.execute(
                 """
@@ -457,7 +703,6 @@ def update_event(
                     }
                 )
 
-            # Update event
             cursor.execute(
                 """
                 UPDATE events
@@ -496,14 +741,12 @@ def update_event(
 @router.post("/{event_id}/publish")
 def publish_event(
     event_id: int,
-    current_user=Depends(
-        require_roles("ADMIN", "ORGANISER")
-    )
+    current_user=Depends(require_roles("ADMIN", "ORGANISER"))
 ):
+
     with get_db_connection() as connection:
         with connection.cursor() as cursor:
 
-            # Find and lock event
             cursor.execute(
                 """
                 SELECT id, status, created_by
@@ -517,12 +760,8 @@ def publish_event(
             event = cursor.fetchone()
 
             if event is None:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Event not found"
-                )
+                raise HTTPException(status_code=404, detail="Event not found")
 
-            # Check ownership
             if (
                 current_user["role"] != "ADMIN"
                 and event["created_by"] != current_user["id"]
@@ -538,7 +777,6 @@ def publish_event(
                     detail="Only draft events can be published"
                 )
 
-            # Check ticket categories
             cursor.execute(
                 """
                 SELECT
@@ -558,7 +796,6 @@ def publish_event(
                     detail="Add at least one ticket category before publishing"
                 )
 
-            # Check total ticket quantity against venue capacity
             cursor.execute(
                 """
                 SELECT v.capacity
@@ -572,10 +809,7 @@ def publish_event(
             venue = cursor.fetchone()
 
             if venue is None:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Venue not found"
-                )
+                raise HTTPException(status_code=404, detail="Venue not found")
 
             if category_info["total_quantity"] > venue["capacity"]:
                 raise HTTPException(
@@ -583,7 +817,6 @@ def publish_event(
                     detail="Ticket quantity exceeds venue capacity"
                 )
 
-            # Publish event
             cursor.execute(
                 """
                 UPDATE events
@@ -609,14 +842,12 @@ def publish_event(
 @router.post("/{event_id}/cancel")
 def cancel_event(
     event_id: int,
-    current_user=Depends(
-        require_roles("ADMIN", "ORGANISER")
-    )
+    current_user=Depends(require_roles("ADMIN", "ORGANISER"))
 ):
+
     with get_db_connection() as connection:
         with connection.cursor() as cursor:
 
-            # Find and lock event
             cursor.execute(
                 """
                 SELECT id, status, created_by
@@ -630,12 +861,8 @@ def cancel_event(
             event = cursor.fetchone()
 
             if event is None:
-                raise HTTPException(
-                    status_code=404,
-                    detail="Event not found"
-                )
+                raise HTTPException(status_code=404, detail="Event not found")
 
-            # Check ownership
             if (
                 current_user["role"] != "ADMIN"
                 and event["created_by"] != current_user["id"]
@@ -651,7 +878,6 @@ def cancel_event(
                     detail="Event is already cancelled"
                 )
 
-            # Cancel event
             cursor.execute(
                 """
                 UPDATE events

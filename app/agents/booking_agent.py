@@ -9,18 +9,25 @@ from app.agents.message import ACLMessage, Performative
 
 class BookingAgent(BaseAgent):
     """
-    Handles ticket booking requests, inventory validation,
-    simulated payments and digital ticket generation.
+    Handles ticket booking requests, simulated payments,
+    digital ticket generation and attendee notifications.
     """
 
     MAX_TICKETS_PER_BOOKING = 10
 
+    # -------------------------------------------------
+    # RECEIVE ACL MESSAGE
+    # -------------------------------------------------
+
     def receive_message(self, message: ACLMessage):
+
         if message.performative != Performative.REQUEST:
             return self._reply(
                 message,
                 Performative.REFUSE,
-                {"reason": "BookingAgent only accepts REQUEST messages."}
+                {
+                    "reason": "BookingAgent only accepts REQUEST messages."
+                }
             )
 
         action = message.content.get("action")
@@ -31,7 +38,9 @@ class BookingAgent(BaseAgent):
         return self._reply(
             message,
             Performative.REFUSE,
-            {"reason": f"Unsupported action: {action}"}
+            {
+                "reason": f"Unsupported action: {action}"
+            }
         )
 
     # -------------------------------------------------
@@ -39,6 +48,7 @@ class BookingAgent(BaseAgent):
     # -------------------------------------------------
 
     def _reply(self, request, performative, content):
+
         return self.send_message(
             receiver=request.sender,
             performative=performative,
@@ -51,14 +61,17 @@ class BookingAgent(BaseAgent):
     # -------------------------------------------------
 
     def _validate_booking_request(self, content):
+
         try:
             user_id = int(content["user_id"])
             event_id = int(content["event_id"])
             category_id = int(content["category_id"])
             quantity = int(content["quantity"])
+
         except (KeyError, TypeError, ValueError):
             raise ValueError(
-                "user_id, event_id, category_id and quantity must be valid integers."
+                "user_id, event_id, category_id and quantity "
+                "must be valid integers."
             )
 
         if user_id <= 0:
@@ -71,34 +84,84 @@ class BookingAgent(BaseAgent):
             raise ValueError("Invalid category_id.")
 
         if quantity <= 0:
-            raise ValueError("Booking quantity must be greater than zero.")
+            raise ValueError(
+                "Booking quantity must be greater than zero."
+            )
 
         if quantity > self.MAX_TICKETS_PER_BOOKING:
             raise ValueError(
-                f"A maximum of {self.MAX_TICKETS_PER_BOOKING} tickets "
-                "can be booked at once."
+                f"A maximum of {self.MAX_TICKETS_PER_BOOKING} "
+                "tickets can be booked at once."
             )
 
         return user_id, event_id, category_id, quantity
+
+    # -------------------------------------------------
+    # SEND NOTIFICATION
+    # -------------------------------------------------
+
+    def send_booking_notification(
+        self,
+        user_id,
+        booking_id,
+        event_title,
+        quantity,
+        total_amount,
+        payment_reference
+    ):
+
+        notification_message = (
+            f"Your booking for {event_title} has been confirmed. "
+            f"Booking ID: {booking_id}. "
+            f"Tickets: {quantity}. "
+            f"Total amount: LKR {total_amount}. "
+            f"Payment reference: {payment_reference}."
+        )
+
+        try:
+            self.send_message(
+                receiver="NotificationAgent",
+                performative=Performative.INFORM,
+                content={
+                    "action": "SEND_NOTIFICATION",
+                    "user_id": user_id,
+                    "message": notification_message
+                }
+            )
+
+            return "SENT"
+
+        except Exception:
+            # A notification failure must not cancel
+            # an already successful booking.
+            return "FAILED"
 
     # -------------------------------------------------
     # CREATE BOOKING
     # -------------------------------------------------
 
     def create_booking(self, message):
+
         try:
             content = message.content
 
-            user_id, event_id, category_id, quantity = (
-                self._validate_booking_request(content)
-            )
+            (
+                user_id,
+                event_id,
+                category_id,
+                quantity
+            ) = self._validate_booking_request(content)
+
+            # -----------------------------------------
+            # DATABASE TRANSACTION
+            # -----------------------------------------
 
             with get_db_connection() as connection:
+
                 with connection.cursor() as cursor:
 
-                    # Lock the ticket category row.
-                    # This prevents concurrent transactions from
-                    # overselling the same ticket category.
+                    # Lock ticket category to prevent
+                    # concurrent bookings from overselling.
                     cursor.execute(
                         """
                         SELECT
@@ -124,18 +187,30 @@ class BookingAgent(BaseAgent):
                         return self._reply(
                             message,
                             Performative.REFUSE,
-                            {"reason": "Ticket category or event not found."}
+                            {
+                                "reason": (
+                                    "Ticket category or event not found."
+                                )
+                            }
                         )
 
-                    # Only published events can receive bookings.
+                    # Check event publication status.
                     if category["event_status"] != "PUBLISHED":
+
                         return self._reply(
                             message,
                             Performative.REFUSE,
-                            {"reason": "This event is not available for booking."}
+                            {
+                                "reason": (
+                                    "This event is not available for booking."
+                                )
+                            }
                         )
 
-                    # Check available ticket inventory.
+                    # ---------------------------------
+                    # CHECK TICKET AVAILABILITY
+                    # ---------------------------------
+
                     cursor.execute(
                         """
                         SELECT COUNT(*) AS sold_count
@@ -147,14 +222,20 @@ class BookingAgent(BaseAgent):
                     )
 
                     sold_count = cursor.fetchone()["sold_count"]
-                    available_quantity = category["quantity"] - sold_count
+
+                    available_quantity = (
+                        category["quantity"] - sold_count
+                    )
 
                     if quantity > available_quantity:
+
                         return self._reply(
                             message,
                             Performative.REFUSE,
                             {
-                                "reason": "Not enough tickets available.",
+                                "reason": (
+                                    "Not enough tickets available."
+                                ),
                                 "requested_quantity": quantity,
                                 "available_quantity": max(
                                     available_quantity, 0
@@ -162,12 +243,16 @@ class BookingAgent(BaseAgent):
                             }
                         )
 
-                    # Check attendee exists and is active.
+                    # ---------------------------------
+                    # CHECK ATTENDEE
+                    # ---------------------------------
+
                     cursor.execute(
                         """
                         SELECT id
                         FROM users
                         WHERE id = %s
+                          AND role = 'ATTENDEE'
                           AND is_active = TRUE
                         """,
                         (user_id,)
@@ -176,16 +261,27 @@ class BookingAgent(BaseAgent):
                     attendee = cursor.fetchone()
 
                     if not attendee:
+
                         return self._reply(
                             message,
                             Performative.REFUSE,
-                            {"reason": "Attendee account not found or inactive."}
+                            {
+                                "reason": (
+                                    "Attendee account not found or inactive."
+                                )
+                            }
                         )
 
-                    # Calculate booking amount.
+                    # ---------------------------------
+                    # CALCULATE TOTAL AMOUNT
+                    # ---------------------------------
+
                     total_amount = category["price"] * quantity
 
-                    # Create booking.
+                    # ---------------------------------
+                    # CREATE BOOKING
+                    # ---------------------------------
+
                     cursor.execute(
                         """
                         INSERT INTO bookings (
@@ -207,14 +303,17 @@ class BookingAgent(BaseAgent):
                     )
 
                     booking = cursor.fetchone()
+
                     booking_id = booking["id"]
 
-                    # Simulated payment reference.
+                    # ---------------------------------
+                    # SIMULATED PAYMENT
+                    # ---------------------------------
+
                     payment_reference = (
                         "ES-" + secrets.token_hex(8).upper()
                     )
 
-                    # Create simulated successful payment.
                     cursor.execute(
                         """
                         INSERT INTO payments (
@@ -234,7 +333,10 @@ class BookingAgent(BaseAgent):
                         )
                     )
 
-                    # Confirm booking after simulated payment.
+                    # ---------------------------------
+                    # CONFIRM BOOKING
+                    # ---------------------------------
+
                     cursor.execute(
                         """
                         UPDATE bookings
@@ -244,10 +346,14 @@ class BookingAgent(BaseAgent):
                         (booking_id,)
                     )
 
-                    # Generate one unique QR token per ticket.
+                    # ---------------------------------
+                    # GENERATE DIGITAL TICKETS
+                    # ---------------------------------
+
                     ticket_ids = []
 
                     for _ in range(quantity):
+
                         qr_token = secrets.token_urlsafe(32)
 
                         cursor.execute(
@@ -269,22 +375,55 @@ class BookingAgent(BaseAgent):
                         )
 
                         ticket = cursor.fetchone()
-                        ticket_ids.append({
-                            "ticket_id": ticket["id"],
-                            "qr_token": qr_token
-                        })
 
-            # Save persistent agent state after successful transaction.
+                        ticket_ids.append(
+                            {
+                                "ticket_id": ticket["id"],
+                                "qr_token": qr_token
+                            }
+                        )
+
+            # -----------------------------------------
+            # DATABASE TRANSACTION COMPLETED
+            # -----------------------------------------
+
+            # Save BookingAgent state.
             self.state["last_booking"] = {
                 "booking_id": booking_id,
                 "event_id": event_id,
                 "user_id": user_id,
                 "quantity": quantity,
                 "status": "CONFIRMED",
-                "processed_at": datetime.now().astimezone().isoformat()
+                "processed_at": (
+                    datetime.now().astimezone().isoformat()
+                )
             }
 
             self.save_state()
+
+            # -----------------------------------------
+            # NOTIFY ATTENDEE THROUGH NOTIFICATION AGENT
+            # -----------------------------------------
+
+            notification_status = self.send_booking_notification(
+                user_id=user_id,
+                booking_id=booking_id,
+                event_title=category["event_title"],
+                quantity=quantity,
+                total_amount=total_amount,
+                payment_reference=payment_reference
+            )
+
+            # Update state with notification result.
+            self.state["last_booking"]["notification_status"] = (
+                notification_status
+            )
+
+            self.save_state()
+
+            # -----------------------------------------
+            # SEND SUCCESSFUL BOOKING RESPONSE
+            # -----------------------------------------
 
             return self._reply(
                 message,
@@ -301,13 +440,17 @@ class BookingAgent(BaseAgent):
                     "booking_status": "CONFIRMED",
                     "payment_status": "SUCCESS",
                     "payment_reference": payment_reference,
+                    "notification_status": notification_status,
                     "tickets": ticket_ids
                 }
             )
 
         except (KeyError, TypeError, ValueError) as error:
+
             return self._reply(
                 message,
                 Performative.REFUSE,
-                {"reason": str(error)}
+                {
+                    "reason": str(error)
+                }
             )

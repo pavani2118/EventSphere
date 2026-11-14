@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Login | EventSphere</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<nav class="navbar navbar-dark bg-dark">
+    <div class="container">
+        <a class="navbar-brand fw-bold" href="/ui">EventSphere</a>
+        <a class="btn btn-outline-light btn-sm" href="/ui/register">Create account</a>
+    </div>
+</nav>
+
+<main class="container auth-container">
+    <div class="card auth-card shadow-sm">
+        <div class="card-body p-4">
+            <h2 class="fw-bold mb-2">Welcome back</h2>
+            <p class="text-muted mb-4">Login to your EventSphere account.</p>
+
+            <div id="message" class="alert d-none" role="alert"></div>
+
+            <form id="loginForm">
+                <div class="mb-3">
+                    <label for="email" class="form-label">Email address</label>
+                    <input type="email" class="form-control" id="email"
+                           required autocomplete="email">
+                </div>
+
+                <div class="mb-3">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" class="form-control" id="password"
+                           required autocomplete="current-password">
+                </div>
+
+                <button type="submit" id="loginButton"
+                        class="btn btn-primary w-100">
+                    Login
+                </button>
+            </form>
+
+            <p class="text-center mt-4 mb-0">
+                Don't have an account?
+                <a href="/ui/register">Register here</a>
+            </p>
+        </div>
+    </div>
+</main>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
