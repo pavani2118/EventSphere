@@ -10,7 +10,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 
 # Database
 from app.database import check_database_connection
-
+from app.scanner import router as scanner_router
 # Authentication schemas
 from app.schemas import UserRegister, UserLogin
 
@@ -21,7 +21,7 @@ from app.auth import (
     logout_user
 )
 from app.bookings import router as booking_router
-
+from app.ticket import router as ticket_router
 # Authentication dependencies
 from app.dependencies import (
     get_current_user,
@@ -43,12 +43,13 @@ app = FastAPI(
     version="1.0.0"
 )
 
-
+from app.bookings import router as booking_router
 # Register routers
 app.include_router(venue_router)
 app.include_router(event_router)
+app.include_router(ticket_router)
 app.include_router(booking_router)
-
+app.include_router(scanner_router)
 # Home endpoint
 @app.get("/")
 def home():
