@@ -2,7 +2,7 @@
 from app.agents.booking_agent import BookingAgent
 from app.agents.runtime import create_agent_runtime
 from app.agents.venue_agent import VenueAgent
-
+from app.agents.waitlist_agent import WaitlistAgent
 from app.agents.ticket_agent import TicketAgent
 def test_runtime_creates_message_bus():
     runtime = create_agent_runtime()
@@ -43,4 +43,14 @@ def test_runtime_registers_ticket_agent():
     assert isinstance(
         runtime["message_bus"].agents["TicketAgent"],
         TicketAgent
+    )
+
+def test_runtime_registers_waitlist_agent():
+    runtime = create_agent_runtime()
+
+    assert "WaitlistAgent" in runtime["message_bus"].agents
+
+    assert isinstance(
+        runtime["message_bus"].agents["WaitlistAgent"],
+        WaitlistAgent
     )
