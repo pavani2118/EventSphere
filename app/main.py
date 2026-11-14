@@ -5,18 +5,37 @@ from fastapi import (
     Depends,
     status
 )
+
 from fastapi.security import HTTPAuthorizationCredentials
 
+# Database
 from app.database import check_database_connection
+
+# Authentication schemas
 from app.schemas import UserRegister, UserLogin
-from app.auth import register_user, login_user, logout_user
+
+# Authentication functions
+from app.auth import (
+    register_user,
+    login_user,
+    logout_user
+)
+
+# Authentication dependencies
 from app.dependencies import (
     get_current_user,
     require_roles,
     bearer_scheme
 )
 
+# Venue Management router
+from app.venues import router as venue_router
 
+# Event Management router
+from app.events import router as event_router
+
+
+# Create FastAPI application
 app = FastAPI(
     title="EventSphere API",
     description="University Event and Venue Booking Platform",
@@ -24,6 +43,12 @@ app = FastAPI(
 )
 
 
+# Register routers
+app.include_router(venue_router)
+app.include_router(event_router)
+
+
+# Home endpoint
 @app.get("/")
 def home():
     return {
@@ -32,11 +57,15 @@ def home():
     }
 
 
+# Health check endpoint
 @app.get("/health")
 def health_check():
-    return {"status": "healthy"}
+    return {
+        "status": "healthy"
+    }
 
 
+# Database health check
 @app.get("/db-health")
 def database_health():
     try:
@@ -54,8 +83,13 @@ def database_health():
         )
 
 
-@app.post("/auth/register", status_code=status.HTTP_201_CREATED)
+# User registration
+@app.post(
+    "/auth/register",
+    status_code=status.HTTP_201_CREATED
+)
 def register(data: UserRegister):
+
     user = register_user(
         data.full_name,
         data.email,
@@ -68,35 +102,46 @@ def register(data: UserRegister):
     }
 
 
+# User login
 @app.post("/auth/login")
 def login(data: UserLogin):
+
     return login_user(
         data.email.strip().lower(),
         data.password
     )
 
 
+# Get current user profile
 @app.get("/auth/me")
-def my_profile(current_user=Depends(get_current_user)):
+def my_profile(
+    current_user=Depends(get_current_user)
+):
     return current_user
 
 
+# User logout
 @app.post("/auth/logout")
 def logout(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     current_user=Depends(get_current_user)
 ):
+
     logout_user(credentials.credentials)
 
-    return {"message": "Logged out successfully"}
+    return {
+        "message": "Logged out successfully"
+    }
 
 
+# Admin and organiser access check
 @app.get("/auth/admin-check")
 def admin_check(
     current_user=Depends(
         require_roles("ADMIN", "ORGANISER")
     )
 ):
+
     return {
         "message": "Access granted",
         "user": current_user
