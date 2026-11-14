@@ -20,6 +20,7 @@ from app.auth import (
     login_user,
     logout_user
 )
+from app.bookings import router as booking_router
 
 # Authentication dependencies
 from app.dependencies import (
@@ -46,7 +47,7 @@ app = FastAPI(
 # Register routers
 app.include_router(venue_router)
 app.include_router(event_router)
-
+app.include_router(booking_router)
 
 # Home endpoint
 @app.get("/")
