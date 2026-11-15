@@ -40,82 +40,106 @@ class NonCommittingConnection:
 @pytest.mark.integration
 def test_expire_waitlist_updates_only_old_entries(monkeypatch):
 
+    test_ids = []
+    test_connection = None
+
     if not os.getenv("PGPASSWORD"):
         pytest.skip("PostgreSQL environment variables are not configured.")
 
-    # Find existing valid foreign-key records.
-    with get_db_connection() as setup_connection:
-
-        with setup_connection.cursor() as cursor:
-
-            cursor.execute("""
-                SELECT id
-                FROM users
-                WHERE role = 'ATTENDEE'
-                  AND is_active = TRUE
-                LIMIT 1
-            """)
-
-            attendee = cursor.fetchone()
-
-            cursor.execute("""
-                SELECT id
-                FROM events
-                WHERE status = 'PUBLISHED'
-                LIMIT 1
-            """)
-
-            event = cursor.fetchone()
-
-            if not attendee or not event:
-                pytest.skip(
-                    "An active attendee and published event are required."
-                )
-
-            # Create one old and one recent waitlist entry.
-            cursor.execute("""
-                INSERT INTO waitlist (
-                    user_id, event_id, quantity, status, created_at
-                )
-                VALUES
-                    (%s, %s, 1, 'WAITING',
-                     NOW() - INTERVAL '8 days'),
-                    (%s, %s, 1, 'WAITING', NOW())
-                RETURNING id
-            """, (
-                attendee["id"],
-                event["id"],
-                attendee["id"],
-                event["id"]
-            ))
-
-            inserted_rows = cursor.fetchall()
-            test_ids = [row["id"] for row in inserted_rows]
-
-    # Open a transaction for the agent operation.
-    test_connection = get_db_connection()
-
     try:
+        # Find a published event and two active attendees who do not already
+        # have an active waitlist row for that event.
+        with get_db_connection() as setup_connection:
+            with setup_connection.cursor() as cursor:
+                cursor.execute("""
+                    WITH eligible AS (
+                        SELECT
+                            e.id AS event_id,
+                            u.id AS user_id,
+                            ROW_NUMBER() OVER (
+                                PARTITION BY e.id
+                                ORDER BY u.id
+                            ) AS attendee_number
+                        FROM events e
+                        CROSS JOIN users u
+                        WHERE e.status = 'PUBLISHED'
+                          AND u.role = 'ATTENDEE'
+                          AND u.is_active = TRUE
+                          AND NOT EXISTS (
+                              SELECT 1
+                              FROM waitlist w
+                              WHERE w.user_id = u.id
+                                AND w.event_id = e.id
+                                AND w.status = 'WAITING'
+                          )
+                    )
+                    SELECT
+                        event_id,
+                        MAX(user_id) FILTER (
+                            WHERE attendee_number = 1
+                        ) AS first_attendee_id,
+                        MAX(user_id) FILTER (
+                            WHERE attendee_number = 2
+                        ) AS second_attendee_id
+                    FROM eligible
+                    GROUP BY event_id
+                    HAVING COUNT(*) >= 2
+                    ORDER BY event_id
+                    LIMIT 1
+                """)
+                fixture = cursor.fetchone()
 
-        connection_wrapper = NonCommittingConnection(
-            test_connection
-        )
+                if not fixture:
+                    pytest.skip(
+                        "Two eligible active attendees for a published "
+                        "event are required."
+                    )
 
-        # Replace the agent's connection function.
+                cursor.execute("""
+                    INSERT INTO waitlist (
+                        user_id, event_id, quantity, status, created_at
+                    )
+                    VALUES
+                        (%s, %s, 1, 'WAITING',
+                         NOW() - INTERVAL '8 days'),
+                        (%s, %s, 1, 'WAITING', NOW())
+                    RETURNING id, created_at
+                """, (
+                    fixture["first_attendee_id"],
+                    fixture["event_id"],
+                    fixture["second_attendee_id"],
+                    fixture["event_id"]
+                ))
+                inserted_rows = cursor.fetchall()
+                old_row = min(
+                    inserted_rows,
+                    key=lambda row: row["created_at"]
+                )
+                recent_row = max(
+                    inserted_rows,
+                    key=lambda row: row["created_at"]
+                )
+                old_id = old_row["id"]
+                recent_id = recent_row["id"]
+                test_ids = [old_id, recent_id]
+
+        # Run the expiry operation in a transaction. Its changes are rolled
+        # back before cleanup, so existing records are never persisted as
+        # modified by this test.
+        test_connection = get_db_connection()
+        connection_wrapper = NonCommittingConnection(test_connection)
+
         monkeypatch.setattr(
             waitlist_module,
             "get_db_connection",
             lambda: connection_wrapper
         )
 
-        bus = FakeMessageBus()
-
         agent = WaitlistAgent(
             "WaitlistAgent",
-            bus
+            FakeMessageBus()
         )
 
-        # Prevent writing agent state outside this test transaction.
         monkeypatch.setattr(
             agent,
             "save_state",
@@ -135,18 +159,15 @@ def test_expire_waitlist_updates_only_old_entries(monkeypatch):
 
         assert response.performative == Performative.AGREE
         assert response.content["success"] is True
-        assert response.content["expired_count"] == 1
+        assert response.content["expired_count"] >= 1
 
-        # Check both database records.
         with test_connection.cursor() as cursor:
-
             cursor.execute("""
                 SELECT id, status
                 FROM waitlist
                 WHERE id = ANY(%s)
                 ORDER BY id
             """, (test_ids,))
-
             results = cursor.fetchall()
 
         statuses = {
@@ -155,22 +176,19 @@ def test_expire_waitlist_updates_only_old_entries(monkeypatch):
         }
 
         assert len(statuses) == 2
-
-        assert statuses[test_ids[0]] == "EXPIRED"
-        assert statuses[test_ids[1]] == "WAITING"
+        assert statuses[old_id] == "EXPIRED"
+        assert statuses[recent_id] == "WAITING"
 
     finally:
+        if test_connection is not None:
+            test_connection.rollback()
+            test_connection.close()
 
-        # Roll back the agent's database changes.
-        test_connection.rollback()
-        test_connection.close()
-
-        # Remove only the test records.
-        with get_db_connection() as cleanup_connection:
-
-            with cleanup_connection.cursor() as cursor:
-
-                cursor.execute("""
-                    DELETE FROM waitlist
-                    WHERE id = ANY(%s)
-                """, (test_ids,))
+        if test_ids:
+            # Delete only rows inserted by this test.
+            with get_db_connection() as cleanup_connection:
+                with cleanup_connection.cursor() as cursor:
+                    cursor.execute("""
+                        DELETE FROM waitlist
+                        WHERE id = ANY(%s)
+                    """, (test_ids,))

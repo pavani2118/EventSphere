@@ -4,7 +4,7 @@
 BEGIN;
 
 ALTER TABLE bookings
-    ADD COLUMN IF NOT EXISTS waitlist_id INTEGER;
+    ADD COLUMN IF NOT EXISTS waitlist_id BIGINT;
 
 DO $$
 BEGIN

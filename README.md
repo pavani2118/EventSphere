@@ -188,6 +188,15 @@ With the application running, open:
 The endpoint inventory and role requirements are documented in
 [docs/API.md](docs/API.md).
 
+## Architecture and academic materials
+
+- [Database documentation](docs/DATABASE.md)
+- [Architecture and Mermaid diagrams](docs/ARCHITECTURE.md)
+- [Final project report outline](docs/PROJECT_REPORT.md)
+- [Presentation outline](docs/PRESENTATION.md)
+- [Screenshot checklist](docs/SCREENSHOTS.md)
+- [Academic submission structure](docs/ACADEMIC_SUBMISSION.md)
+
 ## Testing
 
 ```powershell
@@ -216,14 +225,19 @@ entries while testing.
 
 ## Deployment preparation
 
-Render does not require a repository configuration file for this application.
-Create a Python web service with:
+The repository includes [render.yaml](render.yaml) as a deployment blueprint.
+It defines a web service only and does not provision a database or contain
+secret values. Configure a managed PostgreSQL database separately, then set:
 
 - build command: `pip install -r requirements.txt`
 - start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 - a managed PostgreSQL database
 - `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, and `PGPASSWORD` environment
   variables
+
+The service health check is `/health`. Render deployment remains a manual
+operation and is not claimed as complete until the deployed URL has been
+tested.
 
 Apply and verify the database schema and migration before starting production
 traffic. The application has not been deployed or production-tested from this
