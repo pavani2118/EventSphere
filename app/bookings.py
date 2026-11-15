@@ -14,6 +14,37 @@ router = APIRouter(
 )
 
 
+def _send_cancellation_notification(request, user_id, booking_id):
+    runtime = getattr(request.app.state, "agent_runtime", None)
+    if runtime is None:
+        return "UNAVAILABLE"
+
+    message = ACLMessage(
+        sender="BookingAPI",
+        receiver="NotificationAgent",
+        performative=Performative.INFORM,
+        content={
+            "action": "SEND_NOTIFICATION",
+            "user_id": user_id,
+            "message": (
+                f"Booking #{booking_id} was cancelled and the payment "
+                "was refunded."
+            )
+        }
+    )
+
+    try:
+        response = runtime["message_bus"].send(message)
+    except Exception:
+        return "FAILED"
+
+    return (
+        "SENT"
+        if response and response.performative == Performative.AGREE
+        else "FAILED"
+    )
+
+
 # --------------------------------------------------
 # CREATE BOOKING THROUGH BOOKING AGENT
 # --------------------------------------------------
@@ -106,4 +137,119 @@ def get_my_bookings(
     return {
         "total_bookings": len(bookings),
         "bookings": bookings
+    }
+
+
+@router.post("/{booking_id}/cancel")
+def cancel_booking(
+    booking_id: int,
+    request: Request,
+    current_user=Depends(require_roles("ATTENDEE", "ADMIN"))
+):
+    if booking_id <= 0:
+        raise HTTPException(status_code=400, detail="Invalid booking ID.")
+
+    is_admin = current_user["role"] == "ADMIN"
+
+    with get_db_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, user_id, status
+                FROM bookings
+                WHERE id = %s
+                FOR UPDATE
+                """,
+                (booking_id,)
+            )
+            booking = cursor.fetchone()
+
+            if booking is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail="Booking not found."
+                )
+
+            if not is_admin and booking["user_id"] != current_user["id"]:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You can only cancel your own bookings."
+                )
+
+            if booking["status"] == "CANCELLED":
+                raise HTTPException(
+                    status_code=409,
+                    detail="Booking is already cancelled."
+                )
+
+            if booking["status"] != "CONFIRMED":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Only confirmed bookings can be cancelled."
+                )
+
+            cursor.execute(
+                """
+                SELECT id, status
+                FROM payments
+                WHERE booking_id = %s
+                ORDER BY id DESC
+                LIMIT 1
+                FOR UPDATE
+                """,
+                (booking_id,)
+            )
+            payment = cursor.fetchone()
+
+            if payment and payment["status"] == "SUCCESS":
+                cursor.execute(
+                    """
+                    UPDATE payments
+                    SET status = 'REFUNDED'
+                    WHERE id = %s
+                      AND status = 'SUCCESS'
+                    """,
+                    (payment["id"],)
+                )
+            elif payment and payment["status"] == "REFUNDED":
+                raise HTTPException(
+                    status_code=409,
+                    detail="Payment has already been refunded."
+                )
+
+            cursor.execute(
+                """
+                UPDATE tickets
+                SET status = 'CANCELLED'
+                WHERE booking_id = %s
+                  AND status = 'VALID'
+                """,
+                (booking_id,)
+            )
+
+            cursor.execute(
+                """
+                UPDATE bookings
+                SET status = 'CANCELLED'
+                WHERE id = %s
+                  AND status = 'CONFIRMED'
+                """,
+                (booking_id,)
+            )
+
+    notification_status = _send_cancellation_notification(
+        request,
+        booking["user_id"],
+        booking_id
+    )
+
+    return {
+        "success": True,
+        "booking_id": booking_id,
+        "booking_status": "CANCELLED",
+        "payment_status": (
+            "REFUNDED" if payment and payment["status"] == "SUCCESS"
+            else payment["status"] if payment else "NOT_FOUND"
+        ),
+        "notification_status": notification_status
     }

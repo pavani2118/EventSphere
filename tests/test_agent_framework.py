@@ -92,6 +92,47 @@ def test_message_bus_rejects_unknown_receiver():
         assert "Receiver agent not found" in str(error)
 
 
+def test_base_agent_returns_receiver_response():
+    bus = MessageBus()
+    receiver = DummyAgent("VenueAgent")
+    bus.register(receiver)
+    bus.log_message = lambda message: None
+
+    sender = StateTestAgent("BookingAgent", bus)
+    response = sender.send_message(
+        receiver="VenueAgent",
+        performative=Performative.REQUEST,
+        content={"action": "CHECK_AVAILABILITY"}
+    )
+
+    assert response["status"] == "received"
+    assert response["agent"] == "VenueAgent"
+
+
+def test_message_bus_returns_failure_when_receiver_raises():
+    class FailingAgent:
+        name = "VenueAgent"
+
+        def receive_message(self, message):
+            raise RuntimeError("database unavailable")
+
+    bus = MessageBus()
+    bus.register(FailingAgent())
+    bus.log_message = lambda message: None
+
+    response = bus.send(
+        ACLMessage(
+            sender="BookingAPI",
+            receiver="VenueAgent",
+            performative=Performative.REQUEST
+        )
+    )
+
+    assert response.performative == Performative.FAILURE
+    assert response.receiver == "BookingAPI"
+    assert "could not process" in response.content["reason"]
+
+
 def test_agent_state_persistence():
 
     bus = MessageBus()

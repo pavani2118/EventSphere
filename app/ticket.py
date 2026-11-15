@@ -128,6 +128,50 @@ def generate_ticket_qr(
     )
 
 
+@router.get("/{ticket_id}")
+def get_ticket_details(
+    ticket_id: int,
+    current_user=Depends(require_roles("ATTENDEE", "ADMIN", "GATE_STAFF"))
+):
+    if ticket_id <= 0:
+        raise HTTPException(status_code=400, detail="Invalid ticket ID.")
+
+    with get_db_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT t.id AS ticket_id,
+                       t.status AS ticket_status,
+                       t.checked_in_at,
+                       e.id AS event_id,
+                       e.title AS event_title,
+                       e.start_time,
+                       e.end_time,
+                       v.name AS venue_name,
+                       tc.category_name,
+                       b.id AS booking_id,
+                       b.user_id
+                FROM tickets t
+                JOIN bookings b ON b.id = t.booking_id
+                JOIN events e ON e.id = b.event_id
+                JOIN venues v ON v.id = e.venue_id
+                JOIN ticket_categories tc ON tc.id = t.category_id
+                WHERE t.id = %s
+                  AND (
+                      b.user_id = %s
+                      OR %s IN ('ADMIN', 'GATE_STAFF')
+                  )
+                """,
+                (ticket_id, current_user["id"], current_user["role"])
+            )
+            ticket = cursor.fetchone()
+
+    if ticket is None:
+        raise HTTPException(status_code=404, detail="Ticket not found.")
+
+    return ticket
+
+
 # -------------------------------------------------
 # 3. CHECK-IN THROUGH TICKET AGENT
 # -------------------------------------------------

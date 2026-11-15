@@ -130,3 +130,31 @@ def get_recent_events(current_user=Depends(get_current_user)):
         "total": len(events),
         "events": events
     }
+
+
+@router.get("/admin/recent-bookings")
+def get_recent_bookings(current_user=Depends(get_current_user)):
+    check_admin(current_user)
+
+    with get_db_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT b.id AS booking_id,
+                       e.title AS event_title,
+                       b.quantity,
+                       b.total_amount,
+                       b.status,
+                       b.created_at
+                FROM bookings b
+                JOIN events e ON e.id = b.event_id
+                ORDER BY b.created_at DESC
+                LIMIT 10
+                """
+            )
+            bookings = cursor.fetchall()
+
+    return {
+        "total": len(bookings),
+        "bookings": bookings
+    }

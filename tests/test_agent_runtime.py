@@ -74,3 +74,8 @@ def test_runtime_registers_api_gateway():
         runtime["message_bus"].agents["BookingAPI"],
         APIGatewayAgent
     )
+
+
+def test_runtime_does_not_restore_state_by_default(monkeypatch):
+    runtime = create_agent_runtime()
+    assert runtime["booking_agent"].state == {}

@@ -33,9 +33,7 @@ class BaseAgent(ABC):
 
         message = ACLMessage(**message_data)
 
-        self.message_bus.send(message)
-
-        return message
+        return self.message_bus.send(message)
 
     def save_state(self):
 

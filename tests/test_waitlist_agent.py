@@ -36,7 +36,7 @@ def test_unknown_action_is_refused():
     assert response.performative == Performative.REFUSE
 
 
-def test_non_request_message_is_refused():
+def test_response_message_is_returned_without_rerouting():
     agent, bus = create_agent()
 
     message = create_message(
@@ -45,7 +45,8 @@ def test_non_request_message_is_refused():
     )
     response = agent.receive_message(message)
 
-    assert response.performative == Performative.REFUSE
+    assert response is message
+    assert bus.sent_messages == []
 
 
 def test_join_waitlist_rejects_missing_fields():

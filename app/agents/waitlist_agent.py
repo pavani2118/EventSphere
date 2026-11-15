@@ -1,4 +1,7 @@
+
 from datetime import datetime, timedelta, timezone
+
+from psycopg.errors import UniqueViolation
 
 from app.database import get_db_connection
 from app.agents.base_agent import BaseAgent
@@ -9,7 +12,20 @@ class WaitlistAgent(BaseAgent):
 
     EXPIRY_DAYS = 7
 
+    # -------------------------------------------------
+    # RECEIVE ACL MESSAGE
+    # -------------------------------------------------
+
     def receive_message(self, message: ACLMessage):
+
+        # Return ACL responses to the caller without routing them again.
+        if message.performative in {
+            Performative.AGREE,
+            Performative.REFUSE,
+            Performative.PROPOSE,
+            Performative.FAILURE
+        }:
+            return message
 
         action = message.content.get("action")
 
@@ -25,7 +41,9 @@ class WaitlistAgent(BaseAgent):
             return self._reply(
                 message,
                 Performative.REFUSE,
-                {"reason": f"Unsupported INFORM action: {action}"}
+                {
+                    "reason": f"Unsupported INFORM action: {action}"
+                }
             )
 
         # Handle REQUEST messages.
@@ -33,7 +51,9 @@ class WaitlistAgent(BaseAgent):
             return self._reply(
                 message,
                 Performative.REFUSE,
-                {"reason": "WaitlistAgent accepts REQUEST or INFORM messages."}
+                {
+                    "reason": "WaitlistAgent accepts REQUEST or INFORM messages."
+                }
             )
 
         if action == "JOIN_WAITLIST":
@@ -48,8 +68,14 @@ class WaitlistAgent(BaseAgent):
         return self._reply(
             message,
             Performative.REFUSE,
-            {"reason": f"Unsupported action: {action}"}
+            {
+                "reason": f"Unsupported action: {action}"
+            }
         )
+
+    # -------------------------------------------------
+    # ACL REPLY
+    # -------------------------------------------------
 
     def _reply(self, request, performative, content):
 
@@ -60,7 +86,10 @@ class WaitlistAgent(BaseAgent):
             conversation_id=request.conversation_id
         )
 
-    # Validate waitlist registration.
+    # -------------------------------------------------
+    # VALIDATE WAITLIST REGISTRATION
+    # -------------------------------------------------
+
     def _validate_join_request(self, content):
 
         try:
@@ -74,7 +103,9 @@ class WaitlistAgent(BaseAgent):
             )
 
         if user_id <= 0 or event_id <= 0:
-            raise ValueError("User ID and event ID must be positive.")
+            raise ValueError(
+                "User ID and event ID must be positive."
+            )
 
         if quantity < 1 or quantity > 10:
             raise ValueError(
@@ -83,7 +114,10 @@ class WaitlistAgent(BaseAgent):
 
         return user_id, event_id, quantity
 
-    # Validate event ID.
+    # -------------------------------------------------
+    # VALIDATE EVENT ID
+    # -------------------------------------------------
+
     def _validate_event_id(self, content):
 
         try:
@@ -97,7 +131,10 @@ class WaitlistAgent(BaseAgent):
 
         return event_id
 
-    # Join waitlist.
+    # -------------------------------------------------
+    # JOIN WAITLIST
+    # -------------------------------------------------
+
     def join_waitlist(self, message):
 
         try:
@@ -109,13 +146,17 @@ class WaitlistAgent(BaseAgent):
 
                 with connection.cursor() as cursor:
 
-                    cursor.execute("""
+                    # Check attendee account.
+                    cursor.execute(
+                        """
                         SELECT id
                         FROM users
                         WHERE id = %s
                           AND role = 'ATTENDEE'
                           AND is_active = TRUE
-                    """, (user_id,))
+                        """,
+                        (user_id,)
+                    )
 
                     if not cursor.fetchone():
                         return self._reply(
@@ -126,27 +167,37 @@ class WaitlistAgent(BaseAgent):
                             }
                         )
 
-                    cursor.execute("""
+                    # Check published event.
+                    cursor.execute(
+                        """
                         SELECT id
                         FROM events
                         WHERE id = %s
                           AND status = 'PUBLISHED'
-                    """, (event_id,))
+                        """,
+                        (event_id,)
+                    )
 
                     if not cursor.fetchone():
                         return self._reply(
                             message,
                             Performative.REFUSE,
-                            {"reason": "Published event not found."}
+                            {
+                                "reason": "Published event not found."
+                            }
                         )
 
-                    cursor.execute("""
+                    # Prevent duplicate active waitlist entries.
+                    cursor.execute(
+                        """
                         SELECT id
                         FROM waitlist
                         WHERE user_id = %s
                           AND event_id = %s
                           AND status = 'WAITING'
-                    """, (user_id, event_id))
+                        """,
+                        (user_id, event_id)
+                    )
 
                     if cursor.fetchone():
                         return self._reply(
@@ -159,7 +210,9 @@ class WaitlistAgent(BaseAgent):
                             }
                         )
 
-                    cursor.execute("""
+                    # Insert waitlist entry.
+                    cursor.execute(
+                        """
                         INSERT INTO waitlist (
                             user_id,
                             event_id,
@@ -169,7 +222,9 @@ class WaitlistAgent(BaseAgent):
                         )
                         VALUES (%s, %s, %s, 'WAITING', NOW())
                         RETURNING id, created_at
-                    """, (user_id, event_id, quantity))
+                        """,
+                        (user_id, event_id, quantity)
+                    )
 
                     result = cursor.fetchone()
 
@@ -195,40 +250,120 @@ class WaitlistAgent(BaseAgent):
                 }
             )
 
+        except UniqueViolation:
+            return self._reply(
+                message,
+                Performative.REFUSE,
+                {
+                    "reason": (
+                        "You are already on this event's waitlist."
+                    )
+                }
+            )
+
         except (KeyError, TypeError, ValueError) as error:
 
             return self._reply(
                 message,
                 Performative.REFUSE,
-                {"reason": str(error)}
+                {
+                    "reason": str(error)
+                }
             )
 
-    # Process waitlist when tickets become available.
+    # -------------------------------------------------
+    # PROCESS WAITLIST
+    # -------------------------------------------------
+
     def process_waitlist(self, message):
 
         try:
             event_id = self._validate_event_id(message.content)
 
             processed = []
+            while True:
+                # Claim one FIFO entry and commit before calling BookingAgent.
+                # BookingAgent uses a separate transaction, so holding this
+                # row lock during the ACL call can deadlock on the FK check.
+                with get_db_connection() as connection:
+                    with connection.cursor() as cursor:
+                        cursor.execute(
+                            """
+                            SELECT id, user_id, quantity, created_at
+                            FROM waitlist
+                            WHERE event_id = %s
+                              AND status = 'WAITING'
+                            ORDER BY created_at ASC, id ASC
+                            FOR UPDATE SKIP LOCKED
+                            LIMIT 1
+                            """,
+                            (event_id,)
+                        )
+                        entry = cursor.fetchone()
 
-            with get_db_connection() as connection:
+                        if not entry:
+                            break
 
-                with connection.cursor() as cursor:
+                        cursor.execute(
+                            """
+                            SELECT id
+                            FROM bookings
+                            WHERE waitlist_id = %s
+                              AND status = 'CONFIRMED'
+                            ORDER BY id
+                            LIMIT 1
+                            """,
+                            (entry["id"],)
+                        )
+                        existing_booking = cursor.fetchone()
 
-                    cursor.execute("""
-                        SELECT id, user_id, quantity
-                        FROM waitlist
-                        WHERE event_id = %s
-                          AND status = 'WAITING'
-                        ORDER BY created_at ASC, id ASC
-                        FOR UPDATE SKIP LOCKED
-                    """, (event_id,))
+                        if not existing_booking:
+                            # Reconcile bookings created before waitlist_id
+                            # was added to the bookings table.
+                            cursor.execute(
+                                """
+                                SELECT id
+                                FROM bookings
+                                WHERE user_id = %s
+                                  AND event_id = %s
+                                  AND quantity = %s
+                                  AND status = 'CONFIRMED'
+                                  AND created_at >= %s
+                                ORDER BY created_at, id
+                                LIMIT 1
+                                """,
+                                (
+                                    entry["user_id"],
+                                    event_id,
+                                    entry["quantity"],
+                                    entry["created_at"]
+                                )
+                            )
+                            existing_booking = cursor.fetchone()
 
-                    waiting_entries = cursor.fetchall()
+                        if existing_booking:
+                            cursor.execute(
+                                """
+                                UPDATE waitlist
+                                SET status = 'FULFILLED'
+                                WHERE id = %s
+                                  AND status = 'WAITING'
+                                """,
+                                (entry["id"],)
+                            )
+                            processed.append(
+                                {
+                                    "waitlist_id": entry["id"],
+                                    "user_id": entry["user_id"],
+                                    "status": "FULFILLED",
+                                    "booking_id": existing_booking["id"],
+                                    "idempotent": True
+                                }
+                            )
+                            continue
 
-                    for entry in waiting_entries:
-
-                        cursor.execute("""
+                        cursor.execute(
+                            """
                             SELECT
                                 tc.id AS category_id,
                                 tc.quantity -
@@ -246,47 +381,91 @@ class WaitlistAgent(BaseAgent):
                                 ) >= %s
                             ORDER BY tc.id
                             LIMIT 1
-                        """, (event_id, entry["quantity"]))
-
+                            """,
+                            (event_id, entry["quantity"])
+                        )
                         category = cursor.fetchone()
 
                         if not category:
-                            continue
+                            break
 
-                        # Send ACL REQUEST to BookingAgent.
-                        booking_message = ACLMessage(
-                            sender=self.name,
-                            receiver="BookingAgent",
-                            performative=Performative.REQUEST,
-                            conversation_id=message.conversation_id,
-                            content={
-                                "action": "CREATE_BOOKING",
-                                "user_id": entry["user_id"],
-                                "event_id": event_id,
-                                "category_id": category["category_id"],
-                                "quantity": entry["quantity"]
-                            }
+                        cursor.execute(
+                            """
+                            UPDATE waitlist
+                            SET status = 'OFFERED'
+                            WHERE id = %s
+                              AND status = 'WAITING'
+                            """,
+                            (entry["id"],)
                         )
 
-                        response = self.message_bus.send(booking_message)
+                booking_message = ACLMessage(
+                    sender=self.name,
+                    receiver="BookingAgent",
+                    performative=Performative.REQUEST,
+                    conversation_id=message.conversation_id,
+                    content={
+                        "action": "CREATE_BOOKING",
+                        "user_id": entry["user_id"],
+                        "event_id": event_id,
+                        "category_id": category["category_id"],
+                        "quantity": entry["quantity"],
+                        "waitlist_id": entry["id"]
+                    }
+                )
 
+                try:
+                    response = self.message_bus.send(booking_message)
+                except Exception:
+                    with get_db_connection() as connection:
+                        with connection.cursor() as cursor:
+                            cursor.execute(
+                                """
+                                UPDATE waitlist
+                                SET status = 'WAITING'
+                                WHERE id = %s
+                                  AND status = 'OFFERED'
+                                """,
+                                (entry["id"],)
+                            )
+                    raise
+
+                with get_db_connection() as connection:
+                    with connection.cursor() as cursor:
                         if (
                             response
                             and response.performative == Performative.AGREE
                         ):
-
-                            cursor.execute("""
+                            cursor.execute(
+                                """
                                 UPDATE waitlist
                                 SET status = 'FULFILLED'
                                 WHERE id = %s
-                                  AND status = 'WAITING'
-                            """, (entry["id"],))
-
-                            processed.append({
-                                "waitlist_id": entry["id"],
-                                "user_id": entry["user_id"],
-                                "status": "FULFILLED"
-                            })
+                                  AND status = 'OFFERED'
+                                """,
+                                (entry["id"],)
+                            )
+                            processed.append(
+                                {
+                                    "waitlist_id": entry["id"],
+                                    "user_id": entry["user_id"],
+                                    "status": "FULFILLED",
+                                    "booking_id": response.content.get(
+                                        "booking_id"
+                                    )
+                                }
+                            )
+                        else:
+                            cursor.execute(
+                                """
+                                UPDATE waitlist
+                                SET status = 'WAITING'
+                                WHERE id = %s
+                                  AND status = 'OFFERED'
+                                """,
+                                (entry["id"],)
+                            )
+                            break
 
             self.state["last_processing"] = {
                 "event_id": event_id,
@@ -311,10 +490,15 @@ class WaitlistAgent(BaseAgent):
             return self._reply(
                 message,
                 Performative.REFUSE,
-                {"reason": str(error)}
+                {
+                    "reason": str(error)
+                }
             )
 
-    # Automatically expire old waitlist entries.
+    # -------------------------------------------------
+    # EXPIRE OLD WAITLIST ENTRIES
+    # -------------------------------------------------
+
     def expire_waitlist(self, message):
 
         try:
@@ -327,13 +511,16 @@ class WaitlistAgent(BaseAgent):
 
                 with connection.cursor() as cursor:
 
-                    cursor.execute("""
+                    cursor.execute(
+                        """
                         UPDATE waitlist
                         SET status = 'EXPIRED'
                         WHERE status = 'WAITING'
                           AND created_at < %s
                         RETURNING id
-                    """, (expiry_date,))
+                        """,
+                        (expiry_date,)
+                    )
 
                     expired_entries = cursor.fetchall()
 
@@ -360,5 +547,7 @@ class WaitlistAgent(BaseAgent):
             return self._reply(
                 message,
                 Performative.FAILURE,
-                {"reason": str(error)}
+                {
+                    "reason": str(error)
+                }
             )

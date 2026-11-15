@@ -1,6 +1,12 @@
+import logging
+
 from psycopg.types.json import Jsonb
 
 from app.database import get_db_connection
+from app.agents.message import ACLMessage, Performative
+
+
+logger = logging.getLogger(__name__)
 
 
 class MessageBus:
@@ -45,9 +51,6 @@ class MessageBus:
 
     def send(self, message):
 
-        # Save the message before delivering it.
-        self.log_message(message)
-
         receiver = self.agents.get(message.receiver)
 
         if receiver is None:
@@ -55,5 +58,26 @@ class MessageBus:
                 f"Receiver agent not found: {message.receiver}"
             )
 
+        # Save the message before delivering it.
+        self.log_message(message)
+
         # Deliver through the message bus.
-        return receiver.receive_message(message)
+        try:
+            return receiver.receive_message(message)
+        except Exception:
+            logger.exception(
+                "Agent %s failed to process a message.",
+                message.receiver
+            )
+            return ACLMessage(
+                sender=message.receiver,
+                receiver=message.sender,
+                performative=Performative.FAILURE,
+                conversation_id=message.conversation_id,
+                content={
+                    "reason": (
+                        f"{message.receiver} could not process the "
+                        "message."
+                    )
+                }
+            )

@@ -10,12 +10,13 @@ from app.agents.message import ACLMessage, Performative
 class VenueAgent(BaseAgent):
     """
     Handles venue availability and private venue hire requests.
-    All replies are sent through the ACL MessageBus.
+    All communication is handled through ACL messages.
     """
 
     TURNAROUND_MINUTES = 60
 
     def receive_message(self, message: ACLMessage):
+
         if message.performative != Performative.REQUEST:
             return self._reply(
                 message,
@@ -42,6 +43,7 @@ class VenueAgent(BaseAgent):
     # -------------------------------------------------
 
     def _parse_datetime(self, value):
+
         if not isinstance(value, str):
             raise ValueError("A valid datetime string is required.")
 
@@ -56,6 +58,7 @@ class VenueAgent(BaseAgent):
         return result
 
     def _validate_period(self, content):
+
         start_time = self._parse_datetime(
             content.get("start_time")
         )
@@ -70,10 +73,11 @@ class VenueAgent(BaseAgent):
         return start_time, end_time
 
     # -------------------------------------------------
-    # ACL MESSAGE REPLY
+    # ACL REPLY
     # -------------------------------------------------
 
     def _reply(self, request, performative, content):
+
         return self.send_message(
             receiver=request.sender,
             performative=performative,
@@ -86,11 +90,15 @@ class VenueAgent(BaseAgent):
     # -------------------------------------------------
 
     def _check_conflict(
-        self, cursor, venue_id, start_time, end_time
+        self,
+        cursor,
+        venue_id,
+        start_time,
+        end_time
     ):
+
         buffer = self.TURNAROUND_MINUTES
 
-        # Check existing events
         cursor.execute(
             """
             SELECT id
@@ -120,7 +128,6 @@ class VenueAgent(BaseAgent):
                 "or its turnaround period."
             )
 
-        # Check existing private hire requests
         cursor.execute(
             """
             SELECT id
@@ -164,6 +171,7 @@ class VenueAgent(BaseAgent):
         end_time,
         guest_count
     ):
+
         cursor.execute(
             """
             SELECT id, name, location, capacity, hourly_rate
@@ -198,9 +206,7 @@ class VenueAgent(BaseAgent):
                     "venue_name": venue["name"],
                     "location": venue["location"],
                     "capacity": venue["capacity"],
-                    "hourly_rate": str(
-                        venue["hourly_rate"]
-                    )
+                    "hourly_rate": str(venue["hourly_rate"])
                 })
 
             if len(alternatives) >= 3:
@@ -215,13 +221,18 @@ class VenueAgent(BaseAgent):
     def check_availability(self, message):
 
         try:
+
             content = message.content
 
             venue_id = int(content["venue_id"])
+            guest_count = int(content.get("guest_count", 1))
 
-            start_time, end_time = self._validate_period(
-                content
-            )
+            if guest_count <= 0:
+                raise ValueError(
+                    "Guest count must be greater than zero."
+                )
+
+            start_time, end_time = self._validate_period(content)
 
             with get_db_connection() as connection:
 
@@ -249,8 +260,44 @@ class VenueAgent(BaseAgent):
                         return self._reply(
                             message,
                             Performative.REFUSE,
+                            {"reason": "Venue not found."}
+                        )
+
+                    if not venue["private_hire_available"]:
+                        return self._reply(
+                            message,
+                            Performative.REFUSE,
                             {
-                                "reason": "Venue not found."
+                                "reason": (
+                                    "Private hire is not available "
+                                    "for this venue."
+                                )
+                            }
+                        )
+
+                    if guest_count > venue["capacity"]:
+
+                        alternatives = self._find_alternative_venues(
+                            cursor,
+                            venue_id,
+                            start_time,
+                            end_time,
+                            guest_count
+                        )
+
+                        return self._reply(
+                            message,
+                            (
+                                Performative.PROPOSE
+                                if alternatives
+                                else Performative.REFUSE
+                            ),
+                            {
+                                "reason": (
+                                    "Guest count exceeds venue capacity."
+                                ),
+                                "venue_capacity": venue["capacity"],
+                                "alternatives": alternatives
                             }
                         )
 
@@ -263,18 +310,12 @@ class VenueAgent(BaseAgent):
 
                     if conflict:
 
-                        alternatives = (
-                            self._find_alternative_venues(
-                                cursor,
-                                venue_id,
-                                start_time,
-                                end_time,
-                                int(
-                                    content.get(
-                                        "guest_count", 1
-                                    )
-                                )
-                            )
+                        alternatives = self._find_alternative_venues(
+                            cursor,
+                            venue_id,
+                            start_time,
+                            end_time,
+                            guest_count
                         )
 
                         return self._reply(
@@ -291,12 +332,16 @@ class VenueAgent(BaseAgent):
                             }
                         )
 
-            # Save agent state
+                    venue_result = {
+                        "id": venue["id"],
+                        "name": venue["name"],
+                        "capacity": venue["capacity"],
+                        "hourly_rate": str(venue["hourly_rate"])
+                    }
+
             self.state["last_availability_check"] = {
                 "venue_id": venue_id,
-                "checked_at": (
-                    datetime.now().astimezone().isoformat()
-                ),
+                "checked_at": datetime.now().astimezone().isoformat(),
                 "available": True
             }
 
@@ -306,8 +351,10 @@ class VenueAgent(BaseAgent):
                 message,
                 Performative.AGREE,
                 {
-                    "venue_id": venue["id"],
-                    "venue_name": venue["name"],
+                    "venue_id": venue_result["id"],
+                    "venue_name": venue_result["name"],
+                    "capacity": venue_result["capacity"],
+                    "hourly_rate": venue_result["hourly_rate"],
                     "available": True,
                     "start_time": start_time.isoformat(),
                     "end_time": end_time.isoformat()
@@ -319,9 +366,7 @@ class VenueAgent(BaseAgent):
             return self._reply(
                 message,
                 Performative.REFUSE,
-                {
-                    "reason": str(error)
-                }
+                {"reason": str(error)}
             )
 
     # -------------------------------------------------
@@ -331,21 +376,15 @@ class VenueAgent(BaseAgent):
     def request_private_hire(self, message):
 
         try:
+
             content = message.content
 
             venue_id = int(content["venue_id"])
-
             guest_count = int(content["guest_count"])
-
-            purpose = str(
-                content["purpose"]
-            ).strip()
-
+            purpose = str(content["purpose"]).strip()
             user_id = int(content["user_id"])
 
-            start_time, end_time = self._validate_period(
-                content
-            )
+            start_time, end_time = self._validate_period(content)
 
             if guest_count <= 0:
                 raise ValueError(
@@ -353,9 +392,7 @@ class VenueAgent(BaseAgent):
                 )
 
             if not purpose:
-                raise ValueError(
-                    "A purpose is required."
-                )
+                raise ValueError("A purpose is required.")
 
             with get_db_connection() as connection:
 
@@ -382,14 +419,10 @@ class VenueAgent(BaseAgent):
                         return self._reply(
                             message,
                             Performative.REFUSE,
-                            {
-                                "reason": "Venue not found."
-                            }
+                            {"reason": "Venue not found."}
                         )
 
-                    # Check private hire availability
                     if not venue["private_hire_available"]:
-
                         return self._reply(
                             message,
                             Performative.REFUSE,
@@ -401,21 +434,32 @@ class VenueAgent(BaseAgent):
                             }
                         )
 
-                    # Check venue capacity
                     if guest_count > venue["capacity"]:
+
+                        alternatives = self._find_alternative_venues(
+                            cursor,
+                            venue_id,
+                            start_time,
+                            end_time,
+                            guest_count
+                        )
 
                         return self._reply(
                             message,
-                            Performative.REFUSE,
+                            (
+                                Performative.PROPOSE
+                                if alternatives
+                                else Performative.REFUSE
+                            ),
                             {
                                 "reason": (
                                     "Guest count exceeds venue capacity."
                                 ),
-                                "venue_capacity": venue["capacity"]
+                                "venue_capacity": venue["capacity"],
+                                "alternatives": alternatives
                             }
                         )
 
-                    # Check time conflicts
                     conflict = self._check_conflict(
                         cursor,
                         venue_id,
@@ -425,14 +469,12 @@ class VenueAgent(BaseAgent):
 
                     if conflict:
 
-                        alternatives = (
-                            self._find_alternative_venues(
-                                cursor,
-                                venue_id,
-                                start_time,
-                                end_time,
-                                guest_count
-                            )
+                        alternatives = self._find_alternative_venues(
+                            cursor,
+                            venue_id,
+                            start_time,
+                            end_time,
+                            guest_count
                         )
 
                         return self._reply(
@@ -448,26 +490,19 @@ class VenueAgent(BaseAgent):
                             }
                         )
 
-                    # Calculate private hire price
                     duration_hours = (
                         Decimal(
                             str(
-                                (
-                                    end_time - start_time
-                                ).total_seconds()
+                                (end_time - start_time).total_seconds()
                             )
                         ) / Decimal("3600")
                     )
 
                     quoted_price = (
-                        Decimal(
-                            str(venue["hourly_rate"])
-                        ) * duration_hours
-                    ).quantize(
-                        Decimal("0.01")
-                    )
+                        Decimal(str(venue["hourly_rate"]))
+                        * duration_hours
+                    ).quantize(Decimal("0.01"))
 
-                    # Save private hire request
                     cursor.execute(
                         """
                         INSERT INTO venue_hire_requests (
@@ -497,11 +532,13 @@ class VenueAgent(BaseAgent):
                         )
                     )
 
-                    request = cursor.fetchone()
+                    hire_request = cursor.fetchone()
 
-            # Save agent state
+                    request_id = hire_request["id"]
+                    venue_name = venue["name"]
+
             self.state["last_hire_request"] = {
-                "request_id": request["id"],
+                "request_id": request_id,
                 "venue_id": venue_id,
                 "status": "CONFIRMED"
             }
@@ -512,9 +549,9 @@ class VenueAgent(BaseAgent):
                 message,
                 Performative.AGREE,
                 {
-                    "request_id": request["id"],
+                    "request_id": request_id,
                     "venue_id": venue_id,
-                    "venue_name": venue["name"],
+                    "venue_name": venue_name,
                     "status": "CONFIRMED",
                     "quoted_price": str(quoted_price),
                     "currency": "LKR"
@@ -526,7 +563,5 @@ class VenueAgent(BaseAgent):
             return self._reply(
                 message,
                 Performative.REFUSE,
-                {
-                    "reason": str(error)
-                }
+                {"reason": str(error)}
             )

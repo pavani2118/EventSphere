@@ -126,6 +126,10 @@ if (greeting) {
             document.getElementById("loginLink").classList.add("d-none");
             document.getElementById("registerLink").classList.add("d-none");
             document.getElementById("logoutButton").classList.remove("d-none");
+            document.getElementById("myTicketsLink").classList.remove("d-none");
+            document.getElementById("myBookingsLink").classList.remove("d-none");
+            document.getElementById("waitlistLink").classList.remove("d-none");
+            document.getElementById("notificationsLink").classList.remove("d-none");
 
             const panel = document.getElementById("accountPanel");
             panel.textContent = `You are logged in as ${user.role}.`;

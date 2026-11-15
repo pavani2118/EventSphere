@@ -113,6 +113,27 @@ async function loadAgentMessages() {
     }).join("");
 }
 
+async function loadRecentBookings() {
+    const data = await apiGet("/dashboard/admin/recent-bookings");
+    const table = document.getElementById("bookingTable");
+
+    if (!data.bookings.length) {
+        table.innerHTML = `<tr><td colspan="6">No bookings found.</td></tr>`;
+        return;
+    }
+
+    table.innerHTML = data.bookings.map(booking => `
+        <tr>
+            <td>#${escapeHTML(booking.booking_id)}</td>
+            <td>${escapeHTML(booking.event_title)}</td>
+            <td>${escapeHTML(booking.quantity)}</td>
+            <td>LKR ${escapeHTML(booking.total_amount)}</td>
+            <td>${escapeHTML(booking.status)}</td>
+            <td>${escapeHTML(formatDate(booking.created_at))}</td>
+        </tr>
+    `).join("");
+}
+
 async function loadDashboard() {
     document.getElementById("errorMessage").classList.add("d-none");
 
@@ -120,7 +141,8 @@ async function loadDashboard() {
         await Promise.all([
             loadSummary(),
             loadRecentEvents(),
-            loadAgentMessages()
+            loadAgentMessages(),
+            loadRecentBookings()
         ]);
     } catch (error) {
         showError(error.message);

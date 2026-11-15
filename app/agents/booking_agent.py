@@ -21,6 +21,16 @@ class BookingAgent(BaseAgent):
 
     def receive_message(self, message: ACLMessage):
 
+        # Ignore ACL response messages.
+        # Do not send another response to a response.
+        if message.performative in {
+            Performative.AGREE,
+            Performative.REFUSE,
+            Performative.PROPOSE,
+            Performative.FAILURE
+        }:
+            return message
+
         if message.performative != Performative.REQUEST:
             return self._reply(
                 message,
@@ -94,7 +104,18 @@ class BookingAgent(BaseAgent):
                 "tickets can be booked at once."
             )
 
-        return user_id, event_id, category_id, quantity
+        waitlist_id = content.get("waitlist_id")
+
+        if waitlist_id is not None:
+            try:
+                waitlist_id = int(waitlist_id)
+            except (TypeError, ValueError):
+                raise ValueError("Invalid waitlist_id.")
+
+            if waitlist_id <= 0:
+                raise ValueError("Invalid waitlist_id.")
+
+        return user_id, event_id, category_id, quantity, waitlist_id
 
     # -------------------------------------------------
     # SEND NOTIFICATION
@@ -149,7 +170,8 @@ class BookingAgent(BaseAgent):
                 user_id,
                 event_id,
                 category_id,
-                quantity
+                quantity,
+                waitlist_id
             ) = self._validate_booking_request(content)
 
             # -----------------------------------------
@@ -159,6 +181,47 @@ class BookingAgent(BaseAgent):
             with get_db_connection() as connection:
 
                 with connection.cursor() as cursor:
+
+                    if waitlist_id is not None:
+                        cursor.execute(
+                            """
+                            SELECT id, status, quantity, total_amount
+                            FROM bookings
+                            WHERE waitlist_id = %s
+                            FOR UPDATE
+                            """,
+                            (waitlist_id,)
+                        )
+
+                        existing_booking = cursor.fetchone()
+
+                        if existing_booking:
+                            if existing_booking["status"] != "CONFIRMED":
+                                return self._reply(
+                                    message,
+                                    Performative.REFUSE,
+                                    {
+                                        "reason": (
+                                            "The waitlist booking is not "
+                                            "confirmed."
+                                        )
+                                    }
+                                )
+
+                            return self._reply(
+                                message,
+                                Performative.AGREE,
+                                {
+                                    "booking_id": existing_booking["id"],
+                                    "event_id": event_id,
+                                    "quantity": existing_booking["quantity"],
+                                    "total_amount": str(
+                                        existing_booking["total_amount"]
+                                    ),
+                                    "booking_status": "CONFIRMED",
+                                    "idempotent": True
+                                }
+                            )
 
                     # Lock ticket category to prevent
                     # concurrent bookings from overselling.
@@ -289,20 +352,63 @@ class BookingAgent(BaseAgent):
                             event_id,
                             total_amount,
                             quantity,
-                            status
+                            status,
+                            waitlist_id
                         )
-                        VALUES (%s, %s, %s, %s, 'PENDING')
+                        VALUES (%s, %s, %s, %s, 'PENDING', %s)
+                        ON CONFLICT (waitlist_id)
+                            WHERE waitlist_id IS NOT NULL
+                            DO NOTHING
                         RETURNING id
                         """,
                         (
                             user_id,
                             event_id,
                             total_amount,
-                            quantity
+                            quantity,
+                            waitlist_id
                         )
                     )
 
                     booking = cursor.fetchone()
+
+                    if booking is None:
+                        cursor.execute(
+                            """
+                            SELECT id, status, quantity, total_amount
+                            FROM bookings
+                            WHERE waitlist_id = %s
+                            """,
+                            (waitlist_id,)
+                        )
+                        booking = cursor.fetchone()
+
+                        if not booking:
+                            return self._reply(
+                                message,
+                                Performative.FAILURE,
+                                {
+                                    "reason": (
+                                        "Waitlist booking could not be "
+                                        "created or recovered."
+                                    )
+                                }
+                            )
+
+                        return self._reply(
+                            message,
+                            Performative.AGREE,
+                            {
+                                "booking_id": booking["id"],
+                                "event_id": event_id,
+                                "quantity": booking["quantity"],
+                                "total_amount": str(
+                                    booking["total_amount"]
+                                ),
+                                "booking_status": booking["status"],
+                                "idempotent": True
+                            }
+                        )
 
                     booking_id = booking["id"]
 
