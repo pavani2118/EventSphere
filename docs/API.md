@@ -71,4 +71,5 @@ schemas enforce numeric and period validation through Pydantic.
 | `GET` | `/dashboard/admin/recent-bookings` | `ADMIN` | Return recent bookings |
 | `GET` | `/health` | Public | Application health |
 | `GET` | `/db-health` | Public | Database connectivity check |
+| `POST` | `/cron/waitlist-expiry` | `CRON_SECRET` bearer token | Trigger one idempotent waitlist-expiry sweep |
 | `GET` | `/scanner` | Public page; API actions require staff token | Serve the gate scanner page |

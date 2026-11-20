@@ -25,6 +25,10 @@ def scanner_page():
           href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
           rel="stylesheet">
 
+        <link
+          rel="stylesheet"
+          href="/static/css/style.css?v=4">
+
         <script src="https://unpkg.com/html5-qrcode"></script>
     </head>
 

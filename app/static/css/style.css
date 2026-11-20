@@ -31,6 +31,7 @@ html {
 
 body {
     min-height: 100vh;
+    overflow-x: hidden;
     background: var(--page) !important;
     color: var(--ink);
     font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -482,12 +483,16 @@ textarea.form-control {
 
 .auth-container {
     min-height: calc(100vh - 72px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     padding: 4rem 1rem !important;
 }
 
 .auth-card {
     width: 100%;
     max-width: 460px;
+    margin-inline: auto;
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-md);
 }
@@ -565,6 +570,18 @@ footer small {
 }
 
 @media (max-width: 575.98px) {
+    .container,
+    .container-fluid {
+        padding-right: 1rem;
+        padding-left: 1rem;
+    }
+
+    .auth-container {
+        min-height: calc(100vh - 72px);
+        align-items: flex-start;
+        padding: 1.5rem 1rem !important;
+    }
+
     main.container,
     .container.py-4,
     .container.py-5 {
@@ -602,5 +619,332 @@ footer small {
     .table thead th,
     .table tbody td {
         padding: 0.75rem;
+    }
+}
+
+/* Production UI consistency */
+:root {
+    --radius-xl: 20px;
+    --shadow-card: 0 12px 32px rgba(20, 33, 61, 0.08);
+}
+
+body {
+    background:
+        radial-gradient(circle at 100% 0%, rgba(13, 148, 136, 0.04), transparent 24rem),
+        var(--page) !important;
+}
+
+img,
+canvas,
+video {
+    max-width: 100%;
+}
+
+.navbar {
+    position: relative;
+    z-index: 1030;
+}
+
+.navbar .container {
+    min-height: 72px;
+}
+
+.navbar-nav {
+    align-items: center;
+}
+
+.navbar-nav .nav-link,
+.navbar > .container > div:not(.collapse) .nav-link {
+    white-space: nowrap;
+}
+
+.navbar .btn,
+.navbar button {
+    white-space: nowrap;
+}
+
+main.container,
+div.container {
+    position: relative;
+}
+
+.container.py-4,
+.container.py-5,
+main.container {
+    max-width: 1180px;
+}
+
+main.container > h1,
+main.container > h2,
+div.container > h1,
+div.container > h2,
+div.container.py-4 > div:first-child h2 {
+    letter-spacing: -0.04em;
+}
+
+.hero-section {
+    background: var(--navy);
+}
+
+.hero-section::after {
+    opacity: 0.5;
+}
+
+.feature-card,
+.event-card,
+.ticket-card,
+.card.shadow-sm {
+    box-shadow: var(--shadow-card) !important;
+}
+
+.feature-card,
+.event-card,
+.ticket-card {
+    overflow: hidden;
+}
+
+.feature-card .card-body,
+.event-card .card-body,
+.ticket-card .card-body {
+    display: flex;
+    flex-direction: column;
+}
+
+.event-card .btn,
+.ticket-card .btn,
+.feature-card .btn {
+    margin-top: auto;
+}
+
+.card-body {
+    min-width: 0;
+}
+
+.table-responsive {
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
+}
+
+.table-responsive::-webkit-scrollbar {
+    height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: #cbd5e1;
+}
+
+.table td,
+.table th {
+    overflow-wrap: anywhere;
+}
+
+.list-group-item {
+    background: #fff;
+}
+
+.badge {
+    line-height: 1.2;
+}
+
+.alert {
+    margin-bottom: 1rem;
+}
+
+.auth-container {
+    width: 100%;
+    min-height: calc(100vh - 72px);
+    display: grid;
+    place-items: center;
+    padding: clamp(1.5rem, 5vh, 4rem) 1rem !important;
+}
+
+.auth-card {
+    max-width: 440px;
+    width: min(100%, 440px);
+    overflow: hidden;
+    border: 1px solid rgba(226, 232, 240, 0.9) !important;
+    border-radius: var(--radius-xl) !important;
+    box-shadow: 0 20px 50px rgba(20, 33, 61, 0.13) !important;
+}
+
+.auth-card .card-body {
+    padding: clamp(1.5rem, 5vw, 2.25rem) !important;
+}
+
+.auth-card h2 {
+    margin-bottom: 0.5rem;
+    font-size: clamp(1.55rem, 4vw, 1.9rem);
+}
+
+.auth-card .form-label {
+    margin-bottom: 0.5rem;
+}
+
+.auth-card .form-control {
+    height: 48px;
+}
+
+.auth-card .btn {
+    height: 48px;
+}
+
+.auth-card .alert {
+    margin-bottom: 1.25rem;
+}
+
+.hire-header {
+    background: var(--navy) !important;
+    border-radius: 0 0 var(--radius-xl) var(--radius-xl) !important;
+}
+
+.hire-card,
+.result-card,
+.alternative-card {
+    border-radius: var(--radius-md) !important;
+}
+
+.price-text {
+    color: var(--teal-dark) !important;
+}
+
+#reader {
+    width: 100%;
+    max-width: 480px;
+    margin-inline: auto;
+}
+
+#reader video {
+    border-radius: var(--radius-md);
+}
+
+@media (min-width: 992px) {
+    .navbar-expand-lg .navbar-nav {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .navbar-expand-lg .navbar-collapse {
+        min-width: 0;
+    }
+
+    .navbar > .container {
+        flex-wrap: nowrap;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .navbar,
+    .navbar .container {
+        min-height: 64px;
+    }
+
+    .navbar-nav {
+        width: 100%;
+        align-items: stretch;
+        gap: 0.2rem;
+    }
+
+    .navbar .navbar-nav .nav-link,
+    .navbar > .container > div:not(.collapse) .nav-link {
+        width: 100%;
+        white-space: normal;
+    }
+
+    .navbar > .container > div:not(.collapse) {
+        align-items: stretch;
+        gap: 0.35rem;
+    }
+
+    .navbar .btn,
+    .navbar button {
+        width: 100%;
+    }
+
+    .hero-section h1,
+    .hero-section h2 {
+        font-size: clamp(2.1rem, 8vw, 3.4rem);
+    }
+
+    div.container.py-4 > div.d-flex,
+    div.container.py-4 > div:first-child {
+        gap: 1rem;
+    }
+}
+
+@media (max-width: 575.98px) {
+    body {
+        font-size: 0.92rem;
+    }
+
+    .navbar-brand {
+        font-size: 1.05rem;
+    }
+
+    .navbar-brand::before {
+        width: 28px;
+        height: 28px;
+        margin-right: 0.45rem;
+    }
+
+    .container,
+    .container-fluid {
+        max-width: 100%;
+    }
+
+    .auth-container {
+        min-height: calc(100vh - 64px);
+        align-items: start;
+        padding: 1.25rem 0.75rem !important;
+    }
+
+    .auth-card {
+        max-width: 100%;
+    }
+
+    .auth-card .card-body {
+        padding: 1.35rem !important;
+    }
+
+    .auth-card p.text-muted {
+        margin-bottom: 1.25rem !important;
+    }
+
+    .hero-section {
+        padding: 3.25rem 0 3.75rem;
+    }
+
+    .hero-section h1,
+    .hero-section h2 {
+        font-size: 2.15rem;
+    }
+
+    .hero-section .lead {
+        font-size: 1rem;
+    }
+
+    .feature-card .card-body,
+    .event-card .card-body,
+    .ticket-card .card-body {
+        padding: 1.25rem;
+    }
+
+    div.container.py-4 > div.d-flex,
+    div.container.py-4 > div:first-child {
+        align-items: flex-start !important;
+        flex-direction: column;
+    }
+
+    div.container.py-4 > div.d-flex > .btn,
+    div.container.py-4 > div.d-flex > button {
+        width: 100%;
+    }
+
+    .table {
+        min-width: 680px;
+    }
+
+    .card-body {
+        padding: 1.25rem;
     }
 }

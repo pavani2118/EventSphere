@@ -1,7 +1,10 @@
 
 import asyncio
+import hmac
 import logging
+import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPAuthorizationCredentials
@@ -23,10 +26,28 @@ from app.venue_hire import router as venue_hire_router
 from app.waitlist import router as waitlist_router
 from app.notifications import router as notifications_router
 from app.agents.runtime import create_agent_runtime
+from app.agents.message import ACLMessage, Performative
 from app.agents.waitlist_scheduler import waitlist_expiry_loop
 
 
 logger = logging.getLogger(__name__)
+BASE_DIR = Path(__file__).resolve().parent.parent
+STATIC_DIR = BASE_DIR / "app" / "static"
+TEMPLATE_DIR = BASE_DIR / "app" / "templates"
+
+
+def is_vercel_environment():
+    return os.getenv("VERCEL") == "1"
+
+
+def get_agent_runtime():
+    runtime = getattr(app.state, "agent_runtime", None)
+
+    if runtime is None:
+        runtime = create_agent_runtime(load_persisted_state=True)
+        app.state.agent_runtime = runtime
+
+    return runtime
 
 
 # ========================================
@@ -44,20 +65,24 @@ async def lifespan(app: FastAPI):
 
     print("EventSphere agents initialized successfully.")
 
-    app.state.waitlist_expiry_task = asyncio.create_task(
-        waitlist_expiry_loop(message_bus)
-    )
+    app.state.waitlist_expiry_task = None
+
+    if not is_vercel_environment():
+        app.state.waitlist_expiry_task = asyncio.create_task(
+            waitlist_expiry_loop(message_bus)
+        )
 
     try:
         yield
 
     finally:
-        app.state.waitlist_expiry_task.cancel()
+        if app.state.waitlist_expiry_task is not None:
+            app.state.waitlist_expiry_task.cancel()
 
-        try:
-            await app.state.waitlist_expiry_task
-        except asyncio.CancelledError:
-            print("Waitlist scheduler stopped.")
+            try:
+                await app.state.waitlist_expiry_task
+            except asyncio.CancelledError:
+                print("Waitlist scheduler stopped.")
 
 
 # ========================================
@@ -78,7 +103,7 @@ app = FastAPI(
 
 app.mount(
     "/static",
-    StaticFiles(directory="app/static"),
+    StaticFiles(directory=STATIC_DIR),
     name="static"
 )
 
@@ -114,67 +139,67 @@ def home():
 
 @app.get("/ui")
 def index_page():
-    return FileResponse("app/templates/index.html")
+    return FileResponse(TEMPLATE_DIR / "index.html")
 
 
 @app.get("/ui/login")
 def login_page():
-    return FileResponse("app/templates/login.html")
+    return FileResponse(TEMPLATE_DIR / "login.html")
 
 
 @app.get("/ui/register")
 def register_page():
-    return FileResponse("app/templates/register.html")
+    return FileResponse(TEMPLATE_DIR / "register.html")
 
 @app.get("/ui/venue-hire")
 def venue_hire_page():
-    return FileResponse("app/templates/venue-hire.html")
+    return FileResponse(TEMPLATE_DIR / "venue-hire.html")
 @app.get("/ui/events")
 def events_page():
-    return FileResponse("app/templates/events.html")
+    return FileResponse(TEMPLATE_DIR / "events.html")
 
 
 @app.get("/ui/event/{event_id}")
 def event_details_page(event_id: int):
-    return FileResponse("app/templates/event_details.html")
+    return FileResponse(TEMPLATE_DIR / "event_details.html")
 
 
 @app.get("/ui/my-tickets")
 def my_tickets_page():
-    return FileResponse("app/templates/my_tickets.html")
+    return FileResponse(TEMPLATE_DIR / "my_tickets.html")
 
 @app.get("/ui/my-bookings")
 def my_bookings_page():
-    return FileResponse("app/templates/my_bookings.html")
+    return FileResponse(TEMPLATE_DIR / "my_bookings.html")
 
 @app.get("/ui/my-waitlist")
 def my_waitlist_page():
-    return FileResponse("app/templates/my_waitlist.html")
+    return FileResponse(TEMPLATE_DIR / "my_waitlist.html")
 
 @app.get("/ui/notifications")
 def notifications_page():
-    return FileResponse("app/templates/notifications.html")
+    return FileResponse(TEMPLATE_DIR / "notifications.html")
 
 
 @app.get("/ui/admin")
 def admin_dashboard_page():
-    return FileResponse("app/templates/admin_dashboard.html")
+    return FileResponse(TEMPLATE_DIR / "admin_dashboard.html")
 
 
 @app.get("/ui/manage-venues")
 def manage_venues_page():
-    return FileResponse("app/templates/venues_manage.html")
+    return FileResponse(TEMPLATE_DIR / "venues_manage.html")
 
 
 @app.get("/ui/manage-events")
 def manage_events_page():
-    return FileResponse("app/templates/events_manage.html")
+    return FileResponse(TEMPLATE_DIR / "events_manage.html")
 
 
 @app.get("/ui/manage-ticket-categories/{event_id}")
 def manage_ticket_categories_page(event_id: int):
     return FileResponse(
-        "app/templates/ticket_categories_manage.html"
+        TEMPLATE_DIR / "ticket_categories_manage.html"
     )
 
 # ========================================
@@ -186,6 +211,57 @@ def health_check():
     return {
         "status": "healthy",
         "application": "EventSphere"
+    }
+
+
+@app.post("/cron/waitlist-expiry")
+def trigger_waitlist_expiry(
+    credentials: HTTPAuthorizationCredentials | None = Depends(
+        bearer_scheme
+    )
+):
+    cron_secret = os.getenv("CRON_SECRET")
+
+    if not cron_secret:
+        raise HTTPException(
+            status_code=503,
+            detail="CRON_SECRET is not configured."
+        )
+
+    if (
+        credentials is None
+        or not hmac.compare_digest(
+            credentials.credentials,
+            cron_secret
+        )
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid cron credentials.",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
+    message = ACLMessage(
+        sender="WaitlistScheduler",
+        receiver="WaitlistAgent",
+        performative=Performative.INFORM,
+        content={
+            "action": "EXPIRE_WAITLIST",
+            "trigger": "EXTERNAL_CRON"
+        }
+    )
+    response = get_agent_runtime()["message_bus"].send(message)
+
+    if response.performative != Performative.AGREE:
+        raise HTTPException(
+            status_code=502,
+            detail="Waitlist expiry processing failed."
+        )
+
+    return {
+        "status": "completed",
+        "expired_count": response.content.get("expired_count", 0),
+        "conversation_id": response.conversation_id
     }
 
 

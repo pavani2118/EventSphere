@@ -156,9 +156,13 @@ ignored by Git, but this project does not automatically load `.env` files.
 
 ### Database setup
 
-The repository does not contain a complete bootstrap schema dump. The existing
-application expects the tables described in
-[docs/DATABASE.md](docs/DATABASE.md) to already exist.
+Existing databases must contain the tables described in
+[docs/DATABASE.md](docs/DATABASE.md) before the application starts.
+
+For a fresh Neon database, use the complete
+[database/schema.sql](database/schema.sql) bootstrap file and follow
+[docs/NEON_SCHEMA_SETUP.md](docs/NEON_SCHEMA_SETUP.md). Do not run it against
+an existing database or the original local `eventsphere_db`.
 
 Before applying `database/migrations/001_waitlist_idempotency.sql` to an
 existing database, inspect the current `waitlist_status_check` definition and
@@ -196,6 +200,7 @@ The endpoint inventory and role requirements are documented in
 - [Presentation outline](docs/PRESENTATION.md)
 - [Screenshot checklist](docs/SCREENSHOTS.md)
 - [Academic submission structure](docs/ACADEMIC_SUBMISSION.md)
+- [Vercel and Neon deployment](docs/VERCEL_NEON_DEPLOYMENT.md)
 
 ## Testing
 
@@ -225,19 +230,21 @@ entries while testing.
 
 ## Deployment preparation
 
-The repository includes [render.yaml](render.yaml) as a deployment blueprint.
-It defines a web service only and does not provision a database or contain
-secret values. Configure a managed PostgreSQL database separately, then set:
+The repository retains [render.yaml](render.yaml) as the previous Render
+deployment blueprint. The Vercel and Neon migration files are documented in
+[docs/VERCEL_NEON_DEPLOYMENT.md](docs/VERCEL_NEON_DEPLOYMENT.md).
 
-- build command: `pip install -r requirements.txt`
-- start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-- a managed PostgreSQL database
-- `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, and `PGPASSWORD` environment
-  variables
+For the Vercel deployment, configure a Neon PostgreSQL database separately,
+then set:
 
-The service health check is `/health`. Render deployment remains a manual
-operation and is not claimed as complete until the deployed URL has been
-tested.
+- `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, and `PGPASSWORD`;
+- `PGSSLMODE=require`; and
+- a random `CRON_SECRET` for the protected waitlist-expiry endpoint.
+
+Vercel automatically serves the FastAPI application exported by `index.py`.
+The health endpoint is `/health`. The local waitlist scheduler is disabled in
+Vercel because serverless functions are not permanent processes. Configure an
+external hourly scheduler to call `POST /cron/waitlist-expiry`.
 
 Apply and verify the database schema and migration before starting production
 traffic. The application has not been deployed or production-tested from this

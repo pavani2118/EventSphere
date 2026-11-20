@@ -154,6 +154,10 @@ erDiagram
 ## Runtime lifecycle
 
 `app.main` creates the agent runtime during FastAPI startup, optionally
-restores persisted agent state, starts the waitlist expiry task, and cancels
-the task during shutdown. PostgreSQL credentials are supplied through
-environment variables; no credentials are stored in the repository.
+restores persisted agent state, starts the waitlist expiry task for local
+development, and cancels the task during shutdown. When the Vercel runtime
+marker is present, the infinite task is not started; an authenticated
+`POST /cron/waitlist-expiry` request sends the same `INFORM /
+EXPIRE_WAITLIST` message through the MessageBus. PostgreSQL credentials are
+supplied through environment variables; no credentials are stored in the
+repository.

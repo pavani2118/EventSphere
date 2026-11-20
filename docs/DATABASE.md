@@ -3,9 +3,10 @@
 ## Scope and evidence
 
 This document records tables, columns, and relationships referenced by the
-application SQL. A complete schema dump is not tracked in the repository, so
-constraints not explicitly represented in source must be verified against the
-target PostgreSQL database before migration or deployment.
+application SQL. The fresh-database bootstrap is provided in
+`database/schema.sql`. Existing databases still require a read-only schema
+comparison because the repository cannot prove their historical constraints
+or data state.
 
 All application queries use psycopg parameter binding.
 
@@ -53,6 +54,10 @@ Application logic also relies on:
 - venue rows being locked before availability and hire decisions.
 
 ## Migration safety
+
+For a fresh Neon database, apply `database/schema.sql` once. It includes the
+end state of `database/migrations/001_waitlist_idempotency.sql`; do not run
+that migration a second time on the newly bootstrapped database.
 
 There is currently one migration file. It must be reviewed against the live
 database before execution because it replaces the existing
