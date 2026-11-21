@@ -59,30 +59,59 @@ function showBookingMessage(message, type = "danger") {
 // -----------------------------------------
 
 function getToken() {
+    const sessionToken = (sessionStorage.getItem("access_token") || "").trim();
 
-    return sessionStorage.getItem("access_token");
+    if (sessionToken) return sessionToken;
+
+    const storedToken = (localStorage.getItem("access_token") || "").trim();
+
+    if (storedToken) {
+        sessionStorage.setItem("access_token", storedToken);
+
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) {
+            sessionStorage.setItem("user", storedUser);
+        }
+    }
+
+    return storedToken;
 }
 
 
 function requireLogin() {
-
     const token = getToken();
 
     if (!token) {
-
         showBookingMessage(
-            "Please login first. Redirecting to login page...",
+            "Please login to book tickets.",
             "warning"
         );
-
-        setTimeout(() => {
-            window.location.href = "/ui/login";
-        }, 1200);
-
         return false;
     }
 
     return true;
+}
+
+
+function handleAuthenticationError(response) {
+    if (response.status === 401) {
+        sessionStorage.removeItem("access_token");
+        sessionStorage.removeItem("user");
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("user");
+        showBookingMessage(
+            "Your login session has expired. Please log in again to continue.",
+            "warning"
+        );
+        return;
+    }
+
+    if (response.status === 403) {
+        showBookingMessage(
+            "This action is available to attendee accounts only.",
+            "danger"
+        );
+    }
 }
 
 
@@ -350,6 +379,13 @@ async function bookTickets() {
 
             const detail = result.detail;
 
+            if (response.status === 401 || response.status === 403) {
+                handleAuthenticationError(response);
+                bookButton.disabled = false;
+                bookButton.textContent = "Book Tickets";
+                return;
+            }
+
             throw new Error(
                 typeof detail === "string"
                     ? detail
@@ -373,6 +409,10 @@ async function bookTickets() {
 
 
         await refreshCategories();
+
+        setTimeout(() => {
+            window.location.href = "/ui/my-bookings";
+        }, 1800);
 
 
     } catch (error) {
@@ -457,6 +497,13 @@ async function joinWaitlist() {
         if (!response.ok) {
 
             const detail = result.detail;
+
+            if (response.status === 401 || response.status === 403) {
+                handleAuthenticationError(response);
+                joinWaitlistButton.disabled = false;
+                joinWaitlistButton.textContent = "Join Waitlist";
+                return;
+            }
 
             throw new Error(
                 typeof detail === "string"

@@ -50,8 +50,14 @@ if (loginForm) {
 
             sessionStorage.setItem("access_token", data.access_token);
             sessionStorage.setItem("user", JSON.stringify(data.user));
+            localStorage.setItem("access_token", data.access_token);
+            localStorage.setItem("user", JSON.stringify(data.user));
+            const next = new URLSearchParams(window.location.search).get("next");
+            const safeNext = next && next.startsWith("/") && !next.startsWith("//")
+                ? next
+                : "/ui";
 
-            window.location.href = "/ui";
+            window.location.href = safeNext;
 
         } catch (error) {
             showMessage(error.message);
@@ -114,8 +120,20 @@ if (registerForm) {
 const greeting = document.getElementById("userGreeting");
 
 if (greeting) {
-    const token = sessionStorage.getItem("access_token");
-    const storedUser = sessionStorage.getItem("user");
+    let token = sessionStorage.getItem("access_token");
+    let storedUser = sessionStorage.getItem("user");
+
+    if (!token) {
+        token = localStorage.getItem("access_token");
+        storedUser = localStorage.getItem("user");
+
+        if (token) {
+            sessionStorage.setItem("access_token", token);
+            if (storedUser) {
+                sessionStorage.setItem("user", storedUser);
+            }
+        }
+    }
 
     if (token && storedUser) {
         try {
@@ -270,6 +288,8 @@ if (logoutButton) {
         } finally {
             sessionStorage.removeItem("access_token");
             sessionStorage.removeItem("user");
+            localStorage.removeItem("access_token");
+            localStorage.removeItem("user");
             window.location.href = "/ui";
         }
     });
