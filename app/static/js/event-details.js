@@ -15,6 +15,11 @@ let currentEventId = null;
 let categories = [];
 let failedPayment = null;
 
+document.getElementById("eventDetailsLogout")?.addEventListener("click", () => {
+    EventSphereAuth.clearSession();
+    window.location.href = "/ui/login";
+});
+
 
 // -----------------------------------------
 // GET EVENT ID
@@ -60,22 +65,7 @@ function showBookingMessage(message, type = "danger") {
 // -----------------------------------------
 
 function getToken() {
-    const sessionToken = (sessionStorage.getItem("access_token") || "").trim();
-
-    if (sessionToken) return sessionToken;
-
-    const storedToken = (localStorage.getItem("access_token") || "").trim();
-
-    if (storedToken) {
-        sessionStorage.setItem("access_token", storedToken);
-
-        const storedUser = localStorage.getItem("user");
-        if (storedUser) {
-            sessionStorage.setItem("user", storedUser);
-        }
-    }
-
-    return storedToken;
+    return EventSphereAuth.getToken();
 }
 
 
@@ -96,10 +86,7 @@ function requireLogin() {
 
 function handleAuthenticationError(response) {
     if (response.status === 401) {
-        sessionStorage.removeItem("access_token");
-        sessionStorage.removeItem("user");
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("user");
+        EventSphereAuth.redirectToLogin();
         showBookingMessage(
             "Your login session has expired. Please log in again to continue.",
             "warning"

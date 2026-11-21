@@ -1,8 +1,8 @@
 
 const API_URL = "/venue-hire";
 
-const token = sessionStorage.getItem("access_token");
-const user = JSON.parse(sessionStorage.getItem("user") || "null");
+const token = EventSphereAuth.getToken();
+const user = EventSphereAuth.getUser();
 
 const venueSelect = document.getElementById("venueId");
 const form = document.getElementById("venueHireForm");
@@ -17,8 +17,13 @@ const availabilityButton = document.getElementById(
 const submitButton = document.getElementById("submitButton");
 
 if (!token || !user) {
-    window.location.href = "/ui/login";
+    EventSphereAuth.redirectToLogin();
 }
+
+document.getElementById("venueLogout")?.addEventListener("click", () => {
+    EventSphereAuth.clearSession();
+    window.location.href = "/ui/login";
+});
 
 function escapeHTML(value) {
     return String(value ?? "").replace(/[&<>"']/g, character => ({
@@ -75,6 +80,17 @@ async function apiRequest(url, options = {}) {
     });
 
     const data = await response.json().catch(() => ({}));
+
+    if (response.status === 401) {
+        EventSphereAuth.redirectToLogin();
+        throw new Error("Please log in again.");
+    }
+
+    if (response.status === 403) {
+        throw new Error(
+            "You do not have permission to complete this venue request."
+        );
+    }
 
     if (!response.ok) {
         throw new Error(getErrorMessage(data));

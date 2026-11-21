@@ -1,11 +1,7 @@
 
 const API_BASE = "";
 
-const token = (
-    sessionStorage.getItem("access_token")
-    || localStorage.getItem("access_token")
-    || ""
-).trim();
+const token = EventSphereAuth.getToken();
 
 if (!token) {
     window.location.href = "/ui/login";
@@ -19,12 +15,13 @@ async function apiRequest(url) {
         }
     });
 
-    if (response.status === 401 || response.status === 403) {
-        sessionStorage.clear();
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("user");
-        window.location.href = "/ui/login";
+    if (response.status === 401) {
+        EventSphereAuth.redirectToLogin();
         throw new Error("Please log in again.");
+    }
+
+    if (response.status === 403) {
+        throw new Error("You do not have permission to view this resource.");
     }
 
     if (!response.ok) {
@@ -264,9 +261,7 @@ async function loadQRCode(ticketId) {
 // -------------------------
 
 function logout() {
-    sessionStorage.clear();
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("user");
+    EventSphereAuth.clearSession();
     window.location.href = "/ui/login";
 }
 

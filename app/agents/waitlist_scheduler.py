@@ -13,69 +13,75 @@ logger = logging.getLogger(__name__)
 
 
 def process_event_reminders(message_bus):
-    now = datetime.now(timezone.utc)
-    reminder_window_end = now + timedelta(hours=24)
-    sent_count = 0
+    try:
+        now = datetime.now(timezone.utc)
+        reminder_window_end = now + timedelta(hours=24)
+        sent_count = 0
 
-    with get_db_connection() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                SELECT
-                    b.id AS booking_id,
-                    b.user_id,
-                    e.id AS event_id,
-                    e.title AS event_title,
-                    e.start_time
-                FROM bookings b
-                JOIN events e ON e.id = b.event_id
-                WHERE b.status = 'CONFIRMED'
-                  AND e.status = 'PUBLISHED'
-                  AND e.start_time >= %s
-                  AND e.start_time <= %s
-                """,
-                (now, reminder_window_end)
-            )
-            upcoming = cursor.fetchall()
-
-            for booking in upcoming:
-                reminder_message = (
-                    f"Reminder: {booking['event_title']} starts soon "
-                    f"(Event ID: {booking['event_id']}). "
-                    f"Booking ID: {booking['booking_id']}."
-                )
+        with get_db_connection() as connection:
+            with connection.cursor() as cursor:
                 cursor.execute(
                     """
-                    SELECT id
-                    FROM notifications
-                    WHERE user_id = %s
-                      AND message = %s
-                    LIMIT 1
+                    SELECT
+                        b.id AS booking_id,
+                        b.user_id,
+                        e.id AS event_id,
+                        e.title AS event_title,
+                        e.start_time
+                    FROM bookings b
+                    JOIN events e ON e.id = b.event_id
+                    WHERE b.status = 'CONFIRMED'
+                      AND e.status = 'PUBLISHED'
+                      AND e.start_time >= %s
+                      AND e.start_time <= %s
                     """,
-                    (booking["user_id"], reminder_message)
+                    (now, reminder_window_end)
                 )
-                if cursor.fetchone():
-                    continue
+                upcoming = cursor.fetchall()
 
-                response = message_bus.send(
-                    ACLMessage(
-                        sender="WaitlistScheduler",
-                        receiver="NotificationAgent",
-                        performative=Performative.INFORM,
-                        content={
-                            "action": "SEND_NOTIFICATION",
-                            "user_id": booking["user_id"],
-                            "message": reminder_message
-                        }
+                for booking in upcoming:
+                    reminder_message = (
+                        f"Reminder: {booking['event_title']} starts soon "
+                        f"(Event ID: {booking['event_id']}). "
+                        f"Booking ID: {booking['booking_id']}."
                     )
-                )
-                if (
-                    response
-                    and response.performative == Performative.AGREE
-                ):
-                    sent_count += 1
+                    cursor.execute(
+                        """
+                        SELECT id
+                        FROM notifications
+                        WHERE user_id = %s
+                          AND message = %s
+                        LIMIT 1
+                        """,
+                        (booking["user_id"], reminder_message)
+                    )
+                    if cursor.fetchone():
+                        continue
 
-    return sent_count
+                    response = message_bus.send(
+                        ACLMessage(
+                            sender="WaitlistScheduler",
+                            receiver="NotificationAgent",
+                            performative=Performative.INFORM,
+                            content={
+                                "action": "SEND_NOTIFICATION",
+                                "user_id": booking["user_id"],
+                                "message": reminder_message
+                            }
+                        )
+                    )
+                    if (
+                        response
+                        and response.performative == Performative.AGREE
+                    ):
+                        sent_count += 1
+
+        return sent_count
+    except Exception:
+        logger.exception(
+            "Event reminder sweep could not access the database."
+        )
+        return 0
 
 
 async def waitlist_expiry_loop(message_bus, interval_seconds=None):

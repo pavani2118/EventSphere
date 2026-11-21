@@ -1,8 +1,4 @@
-const token = (
-    sessionStorage.getItem("access_token")
-    || localStorage.getItem("access_token")
-    || ""
-).trim();
+const token = EventSphereAuth.getToken();
 
 if (!token) {
     window.location.href = "/ui/login";
@@ -32,13 +28,13 @@ async function loadBookings() {
         headers: { "Authorization": `Bearer ${token}` }
     });
 
-    if (response.status === 401 || response.status === 403) {
-        sessionStorage.clear();
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("user");
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("user");
-        window.location.href = "/ui/login";
+    if (response.status === 401) {
+        EventSphereAuth.redirectToLogin();
+        return;
+    }
+
+    if (response.status === 403) {
+        showMessage("You do not have permission to view bookings.");
         return;
     }
 
@@ -105,7 +101,7 @@ document.getElementById("bookingList").addEventListener("click", async event => 
 });
 
 document.getElementById("logoutButton").addEventListener("click", () => {
-    sessionStorage.clear();
+    EventSphereAuth.clearSession();
     window.location.href = "/ui/login";
 });
 

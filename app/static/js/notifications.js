@@ -1,8 +1,4 @@
-const token = (
-    sessionStorage.getItem("access_token")
-    || localStorage.getItem("access_token")
-    || ""
-).trim();
+const token = EventSphereAuth.getToken();
 
 if (!token) window.location.href = "/ui/login";
 
@@ -22,12 +18,13 @@ async function loadNotifications() {
     const response = await fetch("/notifications/my-notifications", {
         headers: { "Authorization": `Bearer ${token}` }
     });
-    if (response.status === 401 || response.status === 403) {
-        sessionStorage.clear();
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("user");
-        window.location.href = "/ui/login";
+    if (response.status === 401) {
+        EventSphereAuth.redirectToLogin();
         return;
+    }
+
+    if (response.status === 403) {
+        throw new Error("You do not have permission to view notifications.");
     }
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.detail || "Could not load notifications.");
@@ -80,9 +77,7 @@ document.getElementById("notificationList").addEventListener("click", async even
 });
 
 document.getElementById("logoutButton").addEventListener("click", () => {
-    sessionStorage.clear();
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("user");
+    EventSphereAuth.clearSession();
     window.location.href = "/ui/login";
 });
 

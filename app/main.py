@@ -186,6 +186,11 @@ def notifications_page():
     return FileResponse(TEMPLATE_DIR / "notifications.html")
 
 
+@app.get("/ui/profile")
+def attendee_profile_page():
+    return FileResponse(TEMPLATE_DIR / "attendee_profile.html")
+
+
 @app.get("/ui/admin")
 def admin_dashboard_page():
     return FileResponse(TEMPLATE_DIR / "admin_dashboard.html")

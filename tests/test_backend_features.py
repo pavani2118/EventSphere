@@ -142,7 +142,7 @@ def test_event_details_booking_sends_bearer_token():
 
     assert '"Authorization"' in script
     assert "`Bearer ${token}`" in script
-    assert 'localStorage.getItem("access_token")' in script
+    assert "EventSphereAuth.getToken()" in script
     assert 'fetch("/bookings/"' in script
     assert 'window.location.href = "/ui/my-bookings"' in script
     assert 'Your login session has expired' in script
@@ -170,8 +170,47 @@ def test_attendee_pages_restore_token_from_local_storage():
         with open(relative_path, "r", encoding="utf-8") as script_file:
             script = script_file.read()
 
-        assert 'localStorage.getItem("access_token")' in script
-        assert 'sessionStorage.clear()' in script
+        assert "EventSphereAuth.getToken()" in script
+        assert "EventSphereAuth.clearSession()" in script
+
+
+def test_attendee_403_handling_does_not_auto_logout():
+    for relative_path in (
+        "app/static/js/my-tickets.js",
+        "app/static/js/my-bookings.js",
+        "app/static/js/my-waitlist.js",
+        "app/static/js/notifications.js",
+        "app/static/js/venue-hire.js"
+    ):
+        with open(relative_path, "r", encoding="utf-8") as script_file:
+            script = script_file.read()
+
+        assert "response.status === 403" in script
+        branch_index = script.index("response.status === 403")
+        branch = script[branch_index:branch_index + 220]
+        assert "clearSession" not in branch
+
+
+def test_shared_attendee_auth_helper_exists():
+    with open(
+        "app/static/js/auth-session.js",
+        "r",
+        encoding="utf-8"
+    ) as script_file:
+        script = script_file.read()
+
+    assert "function getToken()" in script
+    assert "function setSession(" in script
+    assert "function clearSession()" in script
+    assert "function redirectToLogin()" in script
+    assert "response.status === 401" in script
+    assert "response.status === 403" in script
+
+
+def test_attendee_profile_page_route():
+    response = client.get("/ui/profile")
+    assert response.status_code == 200
+    assert b"My Profile" in response.content
 
 
 def test_gate_validation_accepts_valid_successful_ticket():

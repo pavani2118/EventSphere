@@ -48,10 +48,7 @@ if (loginForm) {
 
             const data = await readResponse(response);
 
-            sessionStorage.setItem("access_token", data.access_token);
-            sessionStorage.setItem("user", JSON.stringify(data.user));
-            localStorage.setItem("access_token", data.access_token);
-            localStorage.setItem("user", JSON.stringify(data.user));
+            EventSphereAuth.setSession(data.access_token, data.user);
             const next = new URLSearchParams(window.location.search).get("next");
             let safeNext = next && next.startsWith("/") && !next.startsWith("//")
                 ? next
