@@ -609,6 +609,105 @@ footer small {
         padding-left: 1rem;
     }
 
+    /* Professional management-page action layouts */
+    .back-link {
+        display: inline-flex !important;
+        min-height: 40px;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.55rem 0.75rem;
+        border: 1px solid #bfdbfe;
+        border-radius: 9px;
+        background: #eff6ff;
+        color: #2563eb !important;
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .back-link i {
+        font-size: 1rem;
+    }
+
+    .management-table {
+        width: 100%;
+        min-width: 1080px;
+        table-layout: fixed;
+    }
+
+    .management-table th:nth-child(1),
+    .management-table td:nth-child(1) { width: 190px; }
+    .management-table th:nth-child(2),
+    .management-table td:nth-child(2) { width: 120px; }
+    .management-table th:nth-child(3),
+    .management-table td:nth-child(3) { width: 150px; }
+    .management-table th:nth-child(4),
+    .management-table td:nth-child(4) { width: 155px; }
+    .management-table th:nth-child(5),
+    .management-table td:nth-child(5) { width: 105px; }
+    .management-table th:nth-child(6),
+    .management-table td:nth-child(6) { width: 280px; }
+
+    .management-actions {
+        width: 280px !important;
+        min-width: 280px !important;
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 8px !important;
+    }
+
+    .management-actions .btn,
+    .venue-actions .btn {
+        height: 38px !important;
+        min-height: 38px !important;
+        margin: 0 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        white-space: nowrap !important;
+    }
+
+    .management-actions .btn {
+        flex: 0 0 auto;
+    }
+
+    .venue-management-table th:nth-child(6),
+    .venue-management-table td:nth-child(6) {
+        width: 180px;
+    }
+
+    .venue-actions {
+        width: 180px !important;
+        min-width: 180px !important;
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: flex-start !important;
+        gap: 8px !important;
+    }
+
+    @media (max-width: 575.98px) {
+        .management-table {
+            min-width: 940px;
+        }
+
+        .management-actions,
+        .venue-actions {
+            width: 150px !important;
+            min-width: 150px !important;
+            flex-direction: column !important;
+            align-items: stretch !important;
+        }
+
+        .management-actions .btn,
+        .venue-actions .btn {
+            width: 100% !important;
+        }
+    }
+
     /* Shared navigation alignment */
     .navbar-expand-lg .navbar-collapse {
         flex: 1 1 auto;
@@ -870,6 +969,33 @@ footer small {
     @media (min-width: 992px) {
         .navbar-expand-lg > .container {
             flex-wrap: nowrap;
+        }
+
+        #mainNavbar .navbar-nav {
+            flex-wrap: nowrap;
+        }
+
+        #mainNavbar .nav-link,
+        #mainNavbar .btn {
+            white-space: nowrap;
+            font-size: 0.82rem;
+        }
+
+        #mainNavbar .nav-link {
+            padding-inline: 0.55rem !important;
+        }
+
+        #mainNavbar .btn {
+            min-height: 38px;
+            padding-inline: 0.65rem;
+        }
+
+        #userGreeting {
+            max-width: 150px;
+            overflow: hidden;
+            color: var(--navy-soft) !important;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .navbar-expand-lg .navbar-collapse {
