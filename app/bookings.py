@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app.database import get_db_connection
 from app.dependencies import require_roles
-from app.booking_schemas import BookingCreate
+from app.booking_schemas import BookingCreate, PaymentSimulationRequest
 
 from app.agents.message import ACLMessage, Performative
 
@@ -70,7 +70,8 @@ def create_booking(
             "user_id": current_user["id"],
             "event_id": data.event_id,
             "category_id": data.category_id,
-            "quantity": data.quantity
+            "quantity": data.quantity,
+            "payment_result": data.payment_result
         }
     )
 
@@ -93,6 +94,57 @@ def create_booking(
             detail=response.content.get(
                 "reason",
                 "Booking agent could not complete the request."
+            )
+        )
+
+    return response.content
+
+
+@router.post("/{booking_id}/payment")
+def process_simulated_payment(
+    booking_id: int,
+    data: PaymentSimulationRequest,
+    request: Request,
+    current_user=Depends(require_roles("ATTENDEE"))
+):
+    if booking_id <= 0:
+        raise HTTPException(status_code=400, detail="Invalid booking ID.")
+
+    runtime = getattr(request.app.state, "agent_runtime", None)
+    if runtime is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Agent system is not available."
+        )
+
+    message = ACLMessage(
+        sender="BookingAPI",
+        receiver="BookingAgent",
+        performative=Performative.REQUEST,
+        content={
+            "action": "PROCESS_PAYMENT",
+            "booking_id": booking_id,
+            "user_id": current_user["id"],
+            "category_id": data.category_id,
+            "payment_result": data.payment_result
+        }
+    )
+    response = runtime["message_bus"].send(message)
+
+    if response.performative == Performative.REFUSE:
+        raise HTTPException(
+            status_code=400,
+            detail=response.content.get(
+                "reason",
+                "Payment could not be processed."
+            )
+        )
+    if response.performative != Performative.AGREE:
+        raise HTTPException(
+            status_code=500,
+            detail=response.content.get(
+                "reason",
+                "Payment agent could not complete the request."
             )
         )
 

@@ -25,9 +25,13 @@ from app.dashboard import router as dashboard_router
 from app.venue_hire import router as venue_hire_router
 from app.waitlist import router as waitlist_router
 from app.notifications import router as notifications_router
+from app.gate_staff import router as gate_staff_router
 from app.agents.runtime import create_agent_runtime
 from app.agents.message import ACLMessage, Performative
-from app.agents.waitlist_scheduler import waitlist_expiry_loop
+from app.agents.waitlist_scheduler import (
+    waitlist_expiry_loop,
+    process_event_reminders,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -120,6 +124,7 @@ app.include_router(dashboard_router)
 app.include_router(venue_hire_router)
 app.include_router(waitlist_router)
 app.include_router(notifications_router)
+app.include_router(gate_staff_router)
 # ========================================
 # HOME PAGE
 # ========================================
@@ -202,6 +207,36 @@ def manage_ticket_categories_page(event_id: int):
         TEMPLATE_DIR / "ticket_categories_manage.html"
     )
 
+
+@app.get("/ui/organiser/dashboard")
+def organiser_dashboard_page():
+    return FileResponse(TEMPLATE_DIR / "organiser_dashboard.html")
+
+
+@app.get("/ui/gate/dashboard")
+def gate_dashboard_page():
+    return FileResponse(TEMPLATE_DIR / "gate_dashboard.html")
+
+
+@app.get("/ui/gate/scanner")
+def gate_scanner_page():
+    return FileResponse(TEMPLATE_DIR / "gate_scanner.html")
+
+
+@app.get("/ui/gate/history")
+def gate_history_page():
+    return FileResponse(TEMPLATE_DIR / "gate_history.html")
+
+
+@app.get("/ui/gate/events")
+def gate_events_page():
+    return FileResponse(TEMPLATE_DIR / "gate_events.html")
+
+
+@app.get("/ui/gate/profile")
+def gate_profile_page():
+    return FileResponse(TEMPLATE_DIR / "gate_profile.html")
+
 # ========================================
 # HEALTH CHECK
 # ========================================
@@ -258,9 +293,14 @@ def trigger_waitlist_expiry(
             detail="Waitlist expiry processing failed."
         )
 
+    reminder_count = process_event_reminders(
+        get_agent_runtime()["message_bus"]
+    )
+
     return {
         "status": "completed",
         "expired_count": response.content.get("expired_count", 0),
+        "reminder_count": reminder_count,
         "conversation_id": response.conversation_id
     }
 

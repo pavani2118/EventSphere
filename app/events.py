@@ -163,8 +163,13 @@ def get_all_events_for_management(
                     v.location AS venue_location
                 FROM events e
                 LEFT JOIN venues v ON e.venue_id = v.id
+                WHERE %s = 'ADMIN' OR e.created_by = %s
                 ORDER BY e.created_at DESC
-                """
+                """,
+                (
+                    current_user["role"],
+                    current_user["id"]
+                )
             )
 
             events = cursor.fetchall()
@@ -832,6 +837,79 @@ def publish_event(
     return {
         "message": "Event published successfully",
         "event": published_event
+    }
+
+
+# --------------------------------------------------
+# UNPUBLISH EVENT
+# --------------------------------------------------
+@router.post("/{event_id}/unpublish")
+def unpublish_event(
+    event_id: int,
+    current_user=Depends(require_roles("ADMIN", "ORGANISER"))
+):
+    with get_db_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT id, status, created_by
+                FROM events
+                WHERE id = %s
+                FOR UPDATE
+                """,
+                (event_id,)
+            )
+            event = cursor.fetchone()
+
+            if event is None:
+                raise HTTPException(status_code=404, detail="Event not found")
+
+            if (
+                current_user["role"] != "ADMIN"
+                and event["created_by"] != current_user["id"]
+            ):
+                raise HTTPException(
+                    status_code=403,
+                    detail="You cannot manage this event"
+                )
+
+            if event["status"] != "PUBLISHED":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Only published events can be unpublished"
+                )
+
+            cursor.execute(
+                """
+                SELECT COUNT(*) AS booking_count
+                FROM bookings
+                WHERE event_id = %s
+                  AND status != 'CANCELLED'
+                """,
+                (event_id,)
+            )
+            activity = cursor.fetchone()
+
+            if activity["booking_count"] > 0:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Published events with bookings cannot be unpublished"
+                )
+
+            cursor.execute(
+                """
+                UPDATE events
+                SET status = 'DRAFT'
+                WHERE id = %s
+                RETURNING *
+                """,
+                (event_id,)
+            )
+            draft_event = cursor.fetchone()
+
+    return {
+        "message": "Event unpublished successfully",
+        "event": draft_event
     }
 
 

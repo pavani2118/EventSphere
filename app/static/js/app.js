@@ -53,9 +53,23 @@ if (loginForm) {
             localStorage.setItem("access_token", data.access_token);
             localStorage.setItem("user", JSON.stringify(data.user));
             const next = new URLSearchParams(window.location.search).get("next");
-            const safeNext = next && next.startsWith("/") && !next.startsWith("//")
+            let safeNext = next && next.startsWith("/") && !next.startsWith("//")
                 ? next
                 : "/ui";
+
+            if (
+                !next &&
+                String(data.user.role || "").toUpperCase() === "GATE_STAFF"
+            ) {
+                safeNext = "/ui/gate/dashboard";
+            }
+
+            if (
+                !next &&
+                String(data.user.role || "").toUpperCase() === "ORGANISER"
+            ) {
+                safeNext = "/ui/organiser/dashboard";
+            }
 
             window.location.href = safeNext;
 

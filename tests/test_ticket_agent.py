@@ -132,3 +132,17 @@ def test_ticket_agent_rejects_zero_staff_id():
     assert len(bus.sent_messages) == 1
     assert bus.sent_messages[0].performative == Performative.REFUSE
     assert "Invalid staff user ID" in bus.sent_messages[0].content["reason"]
+
+
+def test_ticket_check_in_uses_ticket_row_lock_and_atomic_update():
+    with open(
+        "app/agents/ticket_agent.py",
+        "r",
+        encoding="utf-8"
+    ) as source_file:
+        source = source_file.read()
+
+    assert "FOR UPDATE OF t" in source
+    assert "WHERE id = %s" in source
+    assert "AND status = 'VALID'" in source
+    assert "RETURNING id, checked_in_at" in source

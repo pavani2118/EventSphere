@@ -187,6 +187,46 @@ class WaitlistAgent(BaseAgent):
                             }
                         )
 
+                    # A waitlist entry is valid only when no ticket category
+                    # has enough remaining capacity for the requested quantity.
+                    cursor.execute(
+                        """
+                        SELECT
+                            SUM(
+                                GREATEST(
+                                    tc.quantity -
+                                    COALESCE(s.sold_count, 0),
+                                    0
+                                )
+                            ) AS remaining_quantity
+                        FROM ticket_categories tc
+                        LEFT JOIN (
+                            SELECT category_id, COUNT(*) AS sold_count
+                            FROM tickets
+                            WHERE status IN ('VALID', 'USED')
+                            GROUP BY category_id
+                        ) s ON s.category_id = tc.id
+                        WHERE tc.event_id = %s
+                        """,
+                        (event_id,)
+                    )
+                    availability = cursor.fetchone()
+
+                    if (
+                        availability is None
+                        or int(availability["remaining_quantity"] or 0) < quantity
+                    ):
+                        return self._reply(
+                            message,
+                            Performative.REFUSE,
+                            {
+                                "reason": (
+                                    "Tickets are still available. "
+                                    "Please complete a booking instead."
+                                )
+                            }
+                        )
+
                     # Prevent duplicate active waitlist entries.
                     cursor.execute(
                         """
@@ -351,6 +391,23 @@ class WaitlistAgent(BaseAgent):
                                 """,
                                 (entry["id"],)
                             )
+                            self.message_bus.send(
+                                ACLMessage(
+                                    sender=self.name,
+                                    receiver="NotificationAgent",
+                                    performative=Performative.INFORM,
+                                    conversation_id=message.conversation_id,
+                                    content={
+                                        "action": "SEND_NOTIFICATION",
+                                        "user_id": entry["user_id"],
+                                        "message": (
+                                            "A waitlisted ticket became "
+                                            "available and a booking was "
+                                            "matched to your waitlist entry."
+                                        )
+                                    }
+                                )
+                            )
                             processed.append(
                                 {
                                     "waitlist_id": entry["id"],
@@ -444,6 +501,23 @@ class WaitlistAgent(BaseAgent):
                                   AND status = 'OFFERED'
                                 """,
                                 (entry["id"],)
+                            )
+                            self.message_bus.send(
+                                ACLMessage(
+                                    sender=self.name,
+                                    receiver="NotificationAgent",
+                                    performative=Performative.INFORM,
+                                    conversation_id=message.conversation_id,
+                                    content={
+                                        "action": "SEND_NOTIFICATION",
+                                        "user_id": entry["user_id"],
+                                        "message": (
+                                            "A ticket is available for your "
+                                            "waitlisted event. Your waitlist "
+                                            "booking has been created."
+                                        )
+                                    }
+                                )
                             )
                             processed.append(
                                 {

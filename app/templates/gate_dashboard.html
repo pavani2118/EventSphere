@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Gate Staff Dashboard | EventSphere</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=18">
+</head>
+<body class="bg-light">
+<nav class="navbar navbar-expand-lg navbar-dark gate-navbar">
+    <div class="container">
+        <a class="navbar-brand" href="/ui/gate/dashboard">EventSphere Gate</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#gateNavbar" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="gateNavbar">
+            <div class="navbar-nav ms-lg-auto align-items-lg-center gap-1">
+                <a class="nav-link active" href="/ui/gate/dashboard"><i class="bi bi-speedometer2"></i>Dashboard</a>
+                <a class="nav-link" href="/ui/gate/scanner"><i class="bi bi-qr-code-scan"></i>Scan QR</a>
+                <a class="nav-link" href="/ui/gate/history"><i class="bi bi-clock-history"></i>History</a>
+                <a class="nav-link" href="/ui/gate/events"><i class="bi bi-calendar-event"></i>Events</a>
+                <a class="nav-link" href="/ui/gate/profile"><i class="bi bi-person"></i>Profile</a>
+                <button id="gateLogout" class="btn btn-danger btn-sm ms-lg-2" type="button">Logout</button>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<main class="container py-4 gate-shell">
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+        <div>
+            <span class="section-kicker">Gate operations</span>
+            <h1 class="h2 mb-1">Gate Staff Dashboard</h1>
+            <p id="gateWelcome" class="text-muted mb-0">Today's admission overview</p>
+        </div>
+        <a href="/ui/gate/scanner" class="btn btn-primary"><i class="bi bi-qr-code-scan me-1"></i>Scan Ticket</a>
+    </div>
+
+    <div id="gateError" class="alert alert-danger d-none" role="alert"></div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card stat-card h-100"><div class="card-body">
+                <span class="stat-icon"><i class="bi bi-ticket-perforated"></i></span>
+                <p class="text-muted mb-1">Tickets Expected Today</p>
+                <h3 id="ticketsExpected" class="mb-0">-</h3>
+            </div></div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card h-100"><div class="card-body">
+                <span class="stat-icon"><i class="bi bi-check2-circle"></i></span>
+                <p class="text-muted mb-1">Successfully Checked In</p>
+                <h3 id="ticketsCheckedIn" class="mb-0">-</h3>
+            </div></div>
+        </div>
+        <div class="col-md-4">
+            <div class="card stat-card h-100"><div class="card-body">
+                <span class="stat-icon"><i class="bi bi-hourglass-split"></i></span>
+                <p class="text-muted mb-1">Remaining Tickets</p>
+                <h3 id="ticketsRemaining" class="mb-0">-</h3>
+            </div></div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-lg-7">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center gap-2 mb-3">
+                        <h2 class="h5 mb-0">Event Information</h2>
+                        <select id="eventSelect" class="form-select gate-event-select" aria-label="Select event">
+                            <option value="">All published events</option>
+                        </select>
+                    </div>
+                    <div id="selectedEvent" class="gate-selected-event">Loading event information...</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-5">
+            <div class="card shadow-sm h-100">
+                <div class="card-body">
+                    <h2 class="h5 mb-3">Recent Check-ins</h2>
+                    <div id="recentCheckIns" class="gate-recent-list">Loading recent activity...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/gate-dashboard.js?v=1"></script>
+</body>
+</html>

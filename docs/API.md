@@ -29,6 +29,7 @@ FastAPI generates the authoritative interactive specification at `/docs`.
 | `GET` | `/events/manage/all` | `ADMIN`, `ORGANISER` | List managed events |
 | `PUT` | `/events/{event_id}` | `ADMIN`, `ORGANISER` | Update an event |
 | `POST` | `/events/{event_id}/publish` | `ADMIN`, `ORGANISER` | Publish an event |
+| `POST` | `/events/{event_id}/unpublish` | `ADMIN`, `ORGANISER` (own event) | Return an unpublished event without bookings to draft |
 | `POST` | `/events/{event_id}/cancel` | `ADMIN`, `ORGANISER` | Cancel an event |
 | `POST` | `/events/{event_id}/ticket-categories` | `ADMIN`, `ORGANISER` | Create a ticket category |
 | `GET` | `/events/manage/{event_id}/ticket-categories` | `ADMIN`, `ORGANISER` | List managed categories |
@@ -55,6 +56,7 @@ schemas enforce numeric and period validation through Pydantic.
 | `POST` | `/waitlist/join` | `ATTENDEE` | Join an event waitlist |
 | `GET` | `/waitlist/my-waitlist` | `ATTENDEE` | List the current user's waitlist entries |
 | `POST` | `/waitlist/process/{event_id}` | `ADMIN` | Process an event waitlist |
+| `DELETE` | `/waitlist/{waitlist_id}` | `ATTENDEE` | Cancel an owned active waitlist entry |
 
 ## Venue hire, notifications, and dashboard
 
@@ -65,6 +67,9 @@ schemas enforce numeric and period validation through Pydantic.
 | `GET` | `/venue-hire/my-requests` | Authenticated | List the current user's hire requests |
 | `GET` | `/notifications/my-notifications` | Authenticated | List the current user's notifications |
 | `PATCH` | `/notifications/{notification_id}/read` | Notification owner | Mark a notification read |
+| `PATCH` | `/notifications/mark-all-read` | Authenticated user | Mark all owned notifications read |
+| `GET` | `/dashboard/organiser/summary` | `ORGANISER` | Return organiser event, booking, ticket, and revenue statistics |
+| `GET` | `/dashboard/organiser/bookings` | `ORGANISER` | Return bookings only for the organiser's own events |
 | `GET` | `/dashboard/admin/summary` | `ADMIN` | Return live dashboard totals |
 | `GET` | `/dashboard/admin/agent-messages` | `ADMIN` | Return recent ACL messages |
 | `GET` | `/dashboard/admin/recent-events` | `ADMIN` | Return recent events |
@@ -73,3 +78,8 @@ schemas enforce numeric and period validation through Pydantic.
 | `GET` | `/db-health` | Public | Database connectivity check |
 | `POST` | `/cron/waitlist-expiry` | `CRON_SECRET` bearer token | Trigger one idempotent waitlist-expiry sweep |
 | `GET` | `/scanner` | Public page; API actions require staff token | Serve the gate scanner page |
+| `GET` | `/gate/dashboard` | `GATE_STAFF`, `ADMIN` | Return gate dashboard and event statistics |
+| `GET` | `/gate/events` | `GATE_STAFF`, `ADMIN` | Return authorized published event information |
+| `POST` | `/gate/tickets/validate` | `GATE_STAFF`, `ADMIN` | Validate a QR token or numeric ticket ID |
+| `POST` | `/gate/tickets/check-in` | `GATE_STAFF`, `ADMIN` | Confirm an atomic ticket check-in |
+| `GET` | `/gate/check-ins` | `GATE_STAFF`, `ADMIN` | Search paginated check-in history |

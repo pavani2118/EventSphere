@@ -71,3 +71,27 @@ def mark_notification_read(
         "notification_id": notification["id"],
         "is_read": notification["is_read"]
     }
+
+
+@router.patch("/mark-all-read")
+def mark_all_notifications_read(
+    current_user=Depends(get_current_user)
+):
+    with get_db_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE notifications
+                SET is_read = TRUE
+                WHERE user_id = %s
+                  AND is_read = FALSE
+                RETURNING id
+                """,
+                (current_user["id"],)
+            )
+            updated = cursor.fetchall()
+
+    return {
+        "success": True,
+        "updated_count": len(updated)
+    }

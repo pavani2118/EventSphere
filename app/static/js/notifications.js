@@ -78,6 +78,26 @@ document.getElementById("logoutButton").addEventListener("click", () => {
     window.location.href = "/ui/login";
 });
 
+document.getElementById("markAllRead").addEventListener("click", async () => {
+    const button = document.getElementById("markAllRead");
+    button.disabled = true;
+    try {
+        const response = await fetch("/notifications/mark-all-read", {
+            method: "PATCH",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.detail || "Could not update notifications.");
+        await loadNotifications();
+    } catch (error) {
+        const message = document.getElementById("pageMessage");
+        message.textContent = error.message;
+        message.className = "alert alert-danger";
+    } finally {
+        button.disabled = false;
+    }
+});
+
 loadNotifications().catch(error => {
     const message = document.getElementById("pageMessage");
     message.textContent = error.message;

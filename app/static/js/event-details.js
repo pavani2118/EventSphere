@@ -13,6 +13,7 @@ const soldOutMessage = document.getElementById("soldOutMessage");
 
 let currentEventId = null;
 let categories = [];
+let failedPayment = null;
 
 
 // -----------------------------------------
@@ -300,7 +301,65 @@ function updatePrice() {
 // BOOK TICKETS
 // -----------------------------------------
 
+async function processFailedPayment() {
+    if (!failedPayment) return null;
+
+    const button = document.getElementById("bookButton");
+    button.disabled = true;
+    button.textContent = "Processing payment...";
+
+    try {
+        const response = await fetch(
+            `/bookings/${failedPayment.bookingId}/payment`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${getToken()}`
+                },
+                body: JSON.stringify({
+                    payment_result: "SUCCESS",
+                    category_id: failedPayment.categoryId
+                })
+            }
+        );
+        const result = await response.json();
+        if (!response.ok) {
+            throw new Error(
+                typeof result.detail === "string"
+                    ? result.detail
+                    : "Payment could not be processed."
+            );
+        }
+
+        showBookingMessage(
+            `Payment successful! Booking ID: ${result.booking_id}. ` +
+            `Payment reference: ${result.payment_reference}.`,
+            "success"
+        );
+        button.textContent = "Booking Successful";
+        await refreshCategories();
+        setTimeout(() => {
+            window.location.href = "/ui/my-bookings";
+        }, 1800);
+        return result;
+    } catch (error) {
+        showBookingMessage(error.message);
+        button.disabled = false;
+        button.textContent = "Retry Payment";
+        return null;
+    }
+}
+
 async function bookTickets() {
+
+    if (failedPayment) {
+        const response = await processFailedPayment();
+        if (response) {
+            failedPayment = null;
+        }
+        return;
+    }
 
     if (!requireLogin()) return;
 
@@ -365,7 +424,9 @@ async function bookTickets() {
 
                 category_id: Number(category.id),
 
-                quantity: quantity
+                quantity: quantity,
+
+                payment_result: document.getElementById("paymentResult").value
 
             })
 
@@ -395,24 +456,36 @@ async function bookTickets() {
 
 
         showBookingMessage(
-
-            `Booking successful! Booking ID: ${result.booking_id}. ` +
-            `Payment reference: ${result.payment_reference}. ` +
-            `Total: LKR ${result.total_amount}.`,
-
-            "success"
-
+            result.payment_status === "FAILED"
+                ? `Payment failed for Booking ID ${result.booking_id}. ` +
+                  `No tickets were issued. Total: LKR ${result.total_amount}.`
+                : `Booking successful! Booking ID: ${result.booking_id}. ` +
+                  `Payment reference: ${result.payment_reference}. ` +
+                  `Total: LKR ${result.total_amount}.`,
+            result.payment_status === "FAILED" ? "warning" : "success"
         );
 
 
-        bookButton.textContent = "Booking Successful";
+        bookButton.textContent =
+            result.payment_status === "FAILED"
+                ? "Payment Failed"
+                : "Booking Successful";
 
 
         await refreshCategories();
 
-        setTimeout(() => {
-            window.location.href = "/ui/my-bookings";
-        }, 1800);
+        if (result.payment_status !== "FAILED") {
+            setTimeout(() => {
+                window.location.href = "/ui/my-bookings";
+            }, 1800);
+        } else {
+            failedPayment = {
+                bookingId: result.booking_id,
+                categoryId: Number(category.id)
+            };
+            bookButton.disabled = false;
+            bookButton.textContent = "Retry Successful Payment";
+        }
 
 
     } catch (error) {

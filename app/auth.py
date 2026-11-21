@@ -1,5 +1,7 @@
 
 from datetime import datetime, timedelta, timezone
+import logging
+import psycopg
 
 from fastapi import HTTPException, status
 
@@ -10,6 +12,9 @@ from app.security import (
     generate_access_token,
     hash_access_token
 )
+
+
+logger = logging.getLogger(__name__)
 
 
 def register_user(full_name: str, email: str, password: str):
@@ -38,6 +43,31 @@ def register_user(full_name: str, email: str, password: str):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="An account with this email already exists"
+        )
+
+    try:
+        with get_db_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO notifications (
+                        user_id,
+                        message,
+                        is_read,
+                        created_at
+                    )
+                    VALUES (%s, %s, FALSE, NOW())
+                    """,
+                    (
+                        user["id"],
+                        "Welcome to EventSphere! Your attendee account "
+                        "has been created successfully."
+                    )
+                )
+    except psycopg.Error as error:
+        logger.warning(
+            "Registration notification could not be created: %s",
+            error
         )
 
     return user

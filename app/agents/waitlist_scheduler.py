@@ -1,11 +1,81 @@
 import asyncio
 import logging
 import os
+from datetime import datetime, timedelta, timezone
+
+from app.database import get_db_connection
+from app.agents.message import ACLMessage, Performative
 
 from app.agents.message import ACLMessage, Performative
 
 
 logger = logging.getLogger(__name__)
+
+
+def process_event_reminders(message_bus):
+    now = datetime.now(timezone.utc)
+    reminder_window_end = now + timedelta(hours=24)
+    sent_count = 0
+
+    with get_db_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    b.id AS booking_id,
+                    b.user_id,
+                    e.id AS event_id,
+                    e.title AS event_title,
+                    e.start_time
+                FROM bookings b
+                JOIN events e ON e.id = b.event_id
+                WHERE b.status = 'CONFIRMED'
+                  AND e.status = 'PUBLISHED'
+                  AND e.start_time >= %s
+                  AND e.start_time <= %s
+                """,
+                (now, reminder_window_end)
+            )
+            upcoming = cursor.fetchall()
+
+            for booking in upcoming:
+                reminder_message = (
+                    f"Reminder: {booking['event_title']} starts soon "
+                    f"(Event ID: {booking['event_id']}). "
+                    f"Booking ID: {booking['booking_id']}."
+                )
+                cursor.execute(
+                    """
+                    SELECT id
+                    FROM notifications
+                    WHERE user_id = %s
+                      AND message = %s
+                    LIMIT 1
+                    """,
+                    (booking["user_id"], reminder_message)
+                )
+                if cursor.fetchone():
+                    continue
+
+                response = message_bus.send(
+                    ACLMessage(
+                        sender="WaitlistScheduler",
+                        receiver="NotificationAgent",
+                        performative=Performative.INFORM,
+                        content={
+                            "action": "SEND_NOTIFICATION",
+                            "user_id": booking["user_id"],
+                            "message": reminder_message
+                        }
+                    )
+                )
+                if (
+                    response
+                    and response.performative == Performative.AGREE
+                ):
+                    sent_count += 1
+
+    return sent_count
 
 
 async def waitlist_expiry_loop(message_bus, interval_seconds=None):
@@ -27,6 +97,13 @@ async def waitlist_expiry_loop(message_bus, interval_seconds=None):
     while True:
 
         try:
+            reminder_count = process_event_reminders(message_bus)
+            if reminder_count:
+                logger.info(
+                    "Event reminder sweep completed. Sent: %s",
+                    reminder_count
+                )
+
             # Create an INFORM message for WaitlistAgent.
             message = ACLMessage(
                 sender="WaitlistScheduler",

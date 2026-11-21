@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Check-in History | EventSphere Gate</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=18">
+</head>
+<body class="bg-light">
+<nav class="navbar navbar-expand-lg navbar-dark gate-navbar">
+    <div class="container">
+        <a class="navbar-brand" href="/ui/gate/dashboard">EventSphere Gate</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#gateNavbar" aria-label="Toggle navigation"><span class="navbar-toggler-icon"></span></button>
+        <div class="collapse navbar-collapse" id="gateNavbar">
+            <div class="navbar-nav ms-lg-auto align-items-lg-center gap-1">
+                <a class="nav-link" href="/ui/gate/dashboard">Dashboard</a>
+                <a class="nav-link" href="/ui/gate/scanner">Scan QR</a>
+                <a class="nav-link active" href="/ui/gate/history">History</a>
+                <a class="nav-link" href="/ui/gate/events">Events</a>
+                <a class="nav-link" href="/ui/gate/profile">Profile</a>
+                <button id="gateLogout" class="btn btn-danger btn-sm ms-lg-2" type="button">Logout</button>
+            </div>
+        </div>
+    </div>
+</nav>
+<main class="container py-4 gate-shell">
+    <a href="/ui/gate/dashboard" class="back-link"><i class="bi bi-arrow-left"></i>Back to Dashboard</a>
+    <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+        <div><span class="section-kicker">Audit records</span><h1 class="h2 mb-1">Check-in History</h1></div>
+    </div>
+    <div class="card shadow-sm mb-4"><div class="card-body">
+        <form id="historyFilters" class="row g-3 align-items-end">
+            <div class="col-md-3"><label class="form-label" for="ticketIdFilter">Ticket ID</label><input id="ticketIdFilter" class="form-control" type="number" min="1"></div>
+            <div class="col-md-3"><label class="form-label" for="attendeeFilter">Attendee</label><input id="attendeeFilter" class="form-control" type="search" placeholder="Name or email"></div>
+            <div class="col-md-3"><label class="form-label" for="eventFilter">Event</label><select id="eventFilter" class="form-select"><option value="">All events</option></select></div>
+            <div class="col-md-2"><label class="form-label" for="dateFilter">Date</label><input id="dateFilter" class="form-control" type="date"></div>
+            <div class="col-md-1 d-grid"><button class="btn btn-primary" type="submit"><i class="bi bi-search"></i></button></div>
+        </form>
+    </div></div>
+    <div id="historyError" class="alert alert-danger d-none"></div>
+    <div class="card shadow-sm"><div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 gate-history-table">
+            <thead><tr><th>Ticket</th><th>Event</th><th>Attendee</th><th>Check-in Time</th><th>Staff</th><th>Status</th></tr></thead>
+            <tbody id="historyTable"><tr><td colspan="6" class="text-center py-4">Loading check-in history...</td></tr></tbody>
+        </table>
+    </div></div>
+    <nav class="mt-3" aria-label="Check-in history pages"><ul id="historyPagination" class="pagination justify-content-end"></ul></nav>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/gate-history.js?v=1"></script>
+</body>
+</html>

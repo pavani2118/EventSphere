@@ -97,7 +97,24 @@ def get_my_waitlist(
                     e.title AS event_title,
                     w.quantity,
                     w.status,
-                    w.created_at
+                    w.created_at,
+                    CASE
+                        WHEN w.status = 'WAITING' THEN
+                            (
+                                SELECT COUNT(*)
+                                FROM waitlist earlier
+                                WHERE earlier.event_id = w.event_id
+                                  AND earlier.status = 'WAITING'
+                                  AND (
+                                      earlier.created_at < w.created_at
+                                      OR (
+                                          earlier.created_at = w.created_at
+                                          AND earlier.id <= w.id
+                                      )
+                                  )
+                            )
+                        ELSE NULL
+                    END AS queue_position
                 FROM waitlist w
                 JOIN events e ON e.id = w.event_id
                 WHERE w.user_id = %s
@@ -111,6 +128,42 @@ def get_my_waitlist(
     return {
         "total_entries": len(entries),
         "waitlist": entries
+    }
+
+
+@router.delete("/{waitlist_id}")
+def cancel_waitlist_entry(
+    waitlist_id: int,
+    current_user=Depends(require_roles("ATTENDEE"))
+):
+    if waitlist_id <= 0:
+        raise HTTPException(status_code=400, detail="Invalid waitlist ID.")
+
+    with get_db_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE waitlist
+                SET status = 'CANCELLED'
+                WHERE id = %s
+                  AND user_id = %s
+                  AND status IN ('WAITING', 'OFFERED')
+                RETURNING id
+                """,
+                (waitlist_id, current_user["id"])
+            )
+            entry = cursor.fetchone()
+
+    if entry is None:
+        raise HTTPException(
+            status_code=404,
+            detail="Active waitlist entry not found."
+        )
+
+    return {
+        "success": True,
+        "waitlist_id": waitlist_id,
+        "status": "CANCELLED"
     }
 
 

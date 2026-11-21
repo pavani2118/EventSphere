@@ -134,7 +134,9 @@ class TicketAgent(BaseAgent):
                             e.title AS event_title,
                             e.status AS event_status,
                             b.status AS booking_status,
-                            tc.category_name
+                            tc.category_name,
+                            u.full_name AS attendee_name,
+                            p.status AS payment_status
 
                         FROM tickets t
 
@@ -146,6 +148,17 @@ class TicketAgent(BaseAgent):
 
                         JOIN ticket_categories tc
                             ON tc.id = t.category_id
+
+                        JOIN users u
+                            ON u.id = b.user_id
+
+                        LEFT JOIN LATERAL (
+                            SELECT status
+                            FROM payments
+                            WHERE booking_id = b.id
+                            ORDER BY id DESC
+                            LIMIT 1
+                        ) p ON TRUE
 
                         WHERE t.qr_token = %s
 
@@ -219,16 +232,32 @@ class TicketAgent(BaseAgent):
                             }
                         )
 
-                    # Event must not be cancelled.
-                    if ticket["event_status"] == "CANCELLED":
+                    # Payment must be successful.
+                    if ticket["payment_status"] != "SUCCESS":
 
                         return self._reply(
                             message,
                             Performative.REFUSE,
                             {
                                 "reason": (
-                                    "This event has been cancelled."
-                                )
+                                    "Payment has not completed successfully."
+                                ),
+                                "result": "PAYMENT_NOT_COMPLETED"
+                            }
+                        )
+
+                    # Event must not be cancelled.
+                    if ticket["event_status"] != "PUBLISHED":
+
+                        return self._reply(
+                            message,
+                            Performative.REFUSE,
+                            {
+                                "reason": (
+                                    "This event is not published and valid "
+                                    "for check-in."
+                                ),
+                                "result": "EVENT_NOT_VALID"
                             }
                         )
 
@@ -302,6 +331,7 @@ class TicketAgent(BaseAgent):
                     "event_id": ticket["event_id"],
                     "event_title": ticket["event_title"],
                     "category": ticket["category_name"],
+                    "attendee_name": ticket["attendee_name"],
                     "ticket_status": "USED",
                     "checked_in_by": staff_user_id,
                     "checked_in_at": checked_in_at

@@ -10,6 +10,11 @@ import app.bookings as bookings_module
 import app.notifications as notifications_module
 import app.ticket as ticket_module
 import app.venue_hire as venue_hire_module
+import app.gate_staff as gate_staff_module
+import app.waitlist as waitlist_module
+import app.notifications as notifications_module
+import app.dashboard as dashboard_module
+import app.events as events_module
 from app.agents.message import ACLMessage, Performative
 
 
@@ -153,6 +158,481 @@ def test_login_preserves_safe_booking_return_url():
 
     assert 'new URLSearchParams(window.location.search).get("next")' in script
     assert '!next.startsWith("//")' in script
+
+
+def test_gate_validation_accepts_valid_successful_ticket():
+    ticket = {
+        "ticket_id": 7,
+        "ticket_status": "VALID",
+        "booking_status": "CONFIRMED",
+        "payment_status": "SUCCESS",
+        "event_status": "PUBLISHED",
+    }
+
+    status_code, message = gate_staff_module.validation_status(ticket)
+
+    assert status_code == "VALID"
+    assert "valid" in message.lower()
+
+
+def test_gate_validation_rejects_incomplete_payment():
+    ticket = {
+        "ticket_id": 7,
+        "ticket_status": "VALID",
+        "booking_status": "CONFIRMED",
+        "payment_status": "PENDING",
+        "event_status": "PUBLISHED",
+    }
+
+    status_code, message = gate_staff_module.validation_status(ticket)
+
+    assert status_code == "PAYMENT_NOT_COMPLETED"
+    assert "payment" in message.lower()
+
+
+def test_gate_validation_rejects_used_ticket():
+    ticket = {
+        "ticket_id": 7,
+        "ticket_status": "USED",
+        "booking_status": "CONFIRMED",
+        "payment_status": "SUCCESS",
+        "event_status": "PUBLISHED",
+    }
+
+    status_code, message = gate_staff_module.validation_status(ticket)
+
+    assert status_code == "ALREADY_CHECKED_IN"
+
+
+def test_gate_validation_rejects_cancelled_event():
+    ticket = {
+        "ticket_id": 7,
+        "ticket_status": "VALID",
+        "booking_status": "CONFIRMED",
+        "payment_status": "SUCCESS",
+        "event_status": "CANCELLED",
+    }
+
+    status_code, message = gate_staff_module.validation_status(ticket)
+
+    assert status_code == "EVENT_NOT_VALID"
+
+
+def test_gate_dashboard_requires_authentication():
+    response = client.get("/gate/dashboard")
+    assert response.status_code == 401
+
+
+def test_gate_dashboard_rejects_attendee(monkeypatch):
+    monkeypatch.setattr(
+        dependencies_module,
+        "get_user_from_token",
+        lambda token: {"id": 184, "role": "ATTENDEE"}
+    )
+    response = client.get(
+        "/gate/dashboard",
+        headers={"Authorization": "Bearer valid-attendee-token"}
+    )
+    assert response.status_code == 403
+
+
+def test_gate_dashboard_allows_gate_staff(monkeypatch):
+    monkeypatch.setattr(
+        dependencies_module,
+        "get_user_from_token",
+        lambda token: {"id": 25, "role": "GATE_STAFF"}
+    )
+
+    database = FakeDatabase(fetchall_value=[], fetchone_values=[{
+        "total_issued_today": 0,
+        "checked_in_today": 0,
+        "remaining_today": 0
+    }])
+    monkeypatch.setattr(
+        gate_staff_module,
+        "get_db_connection",
+        lambda: database
+    )
+
+    response = client.get(
+        "/gate/dashboard",
+        headers={"Authorization": "Bearer valid-gate-token"}
+    )
+    assert response.status_code == 200
+
+
+def test_gate_dashboard_allows_admin(monkeypatch):
+    monkeypatch.setattr(
+        dependencies_module,
+        "get_user_from_token",
+        lambda token: {"id": 1, "role": "ADMIN"}
+    )
+
+    database = FakeDatabase(fetchall_value=[], fetchone_values=[{
+        "total_issued_today": 0,
+        "checked_in_today": 0,
+        "remaining_today": 0
+    }])
+    monkeypatch.setattr(
+        gate_staff_module,
+        "get_db_connection",
+        lambda: database
+    )
+
+    response = client.get(
+        "/gate/dashboard",
+        headers={"Authorization": "Bearer valid-admin-token"}
+    )
+    assert response.status_code == 200
+
+
+def test_gate_validate_requires_authentication():
+    response = client.post(
+        "/gate/tickets/validate",
+        json={"qr_token": "A" * 32}
+    )
+    assert response.status_code == 401
+
+
+def test_gate_history_requires_authentication():
+    response = client.get("/gate/check-ins")
+    assert response.status_code == 401
+
+
+def test_gate_check_in_route_accepts_valid_gate_staff(monkeypatch):
+    class SuccessfulCheckInBus:
+        def send(self, message):
+            return ACLMessage(
+                sender="TicketAgent",
+                receiver="GateAPI",
+                performative=Performative.AGREE,
+                conversation_id=message.conversation_id,
+                content={
+                    "success": True,
+                    "ticket_id": 9,
+                    "event_id": 3,
+                    "event_title": "Test Event",
+                    "attendee_name": "Test Attendee",
+                    "checked_in_at": "2026-11-21T12:00:00+00:00"
+                }
+            )
+
+    monkeypatch.setattr(
+        dependencies_module,
+        "get_user_from_token",
+        lambda token: {"id": 25, "role": "GATE_STAFF"}
+    )
+
+    with client:
+        app.state.agent_runtime = {"message_bus": SuccessfulCheckInBus()}
+        response = client.post(
+            "/gate/tickets/check-in",
+            headers={"Authorization": "Bearer valid-gate-token"},
+            json={"qr_token": "A" * 32}
+        )
+
+    assert response.status_code == 200
+    assert response.json()["ticket_id"] == 9
+    assert response.json()["result"] == "VALID"
+
+
+def test_gate_check_in_route_rejects_attendee(monkeypatch):
+    monkeypatch.setattr(
+        dependencies_module,
+        "get_user_from_token",
+        lambda token: {"id": 184, "role": "ATTENDEE"}
+    )
+    response = client.post(
+        "/gate/tickets/check-in",
+        headers={"Authorization": "Bearer valid-attendee-token"},
+        json={"qr_token": "A" * 32}
+    )
+    assert response.status_code == 403
+
+
+def test_gate_history_retrieval_filters_records(monkeypatch):
+    monkeypatch.setattr(
+        dependencies_module,
+        "get_user_from_token",
+        lambda token: {"id": 25, "role": "GATE_STAFF"}
+    )
+
+    database = FakeDatabase(
+        fetchone_values=[{"count": 1}],
+        fetchall_value=[{
+            "ticket_id": 9,
+            "event_title": "Test Event",
+            "attendee_name": "Test Attendee",
+            "staff_name": "Gate Staff",
+            "checked_in_at": "2026-11-21T12:00:00+00:00"
+        }]
+    )
+    monkeypatch.setattr(
+        gate_staff_module,
+        "get_db_connection",
+        lambda: database
+    )
+
+    response = client.get(
+        "/gate/check-ins?ticket_id=9",
+        headers={"Authorization": "Bearer valid-gate-token"}
+    )
+    assert response.status_code == 200
+    assert response.json()["total"] == 1
+    assert response.json()["check_ins"][0]["ticket_id"] == 9
+
+
+def test_waitlist_owner_can_leave_waitlist(monkeypatch):
+    database = FakeDatabase(fetchone_values=[{"id": 12}])
+    monkeypatch.setattr(
+        waitlist_module,
+        "get_db_connection",
+        lambda: database
+    )
+
+    response = waitlist_module.cancel_waitlist_entry(
+        12,
+        {"id": 184, "role": "ATTENDEE"}
+    )
+
+    assert response["status"] == "CANCELLED"
+    assert "UPDATE waitlist" in database.executed[0][0]
+    assert database.executed[0][1] == (12, 184)
+
+
+def test_waitlist_leave_rejects_missing_owned_entry(monkeypatch):
+    database = FakeDatabase(fetchone_values=[None])
+    monkeypatch.setattr(
+        waitlist_module,
+        "get_db_connection",
+        lambda: database
+    )
+
+    with pytest.raises(HTTPException) as error:
+        waitlist_module.cancel_waitlist_entry(
+            12,
+            {"id": 184, "role": "ATTENDEE"}
+        )
+
+    assert error.value.status_code == 404
+
+
+def test_mark_all_notifications_updates_owner_records(monkeypatch):
+    database = FakeDatabase(fetchall_value=[{"id": 1}, {"id": 2}])
+    monkeypatch.setattr(
+        notifications_module,
+        "get_db_connection",
+        lambda: database
+    )
+
+    response = notifications_module.mark_all_notifications_read(
+        {"id": 184}
+    )
+
+    assert response["updated_count"] == 2
+    assert "AND is_read = FALSE" in database.executed[0][0]
+    assert database.executed[0][1] == (184,)
+
+
+def test_organiser_summary_uses_organiser_id(monkeypatch):
+    database = FakeDatabase(
+        fetchone_values=[
+            {
+                "total_events": 3,
+                "published_events": 2,
+                "draft_events": 1,
+                "cancelled_events": 0
+            },
+            {
+                "total_bookings": 5,
+                "confirmed_bookings": 4,
+                "total_tickets": 8,
+                "active_tickets": 7
+            },
+            {"total_revenue": 50000},
+        ],
+        fetchall_value=[{
+            "booking_id": 9,
+            "event_title": "Test Event"
+        }]
+    )
+    monkeypatch.setattr(
+        dashboard_module,
+        "get_db_connection",
+        lambda: database
+    )
+
+    response = dashboard_module.get_organiser_summary(
+        {"id": 25, "role": "ORGANISER"}
+    )
+
+    assert response["total_events"] == 3
+    assert response["total_revenue"] == 50000
+    assert all(
+        call_params == (25,)
+        for _, call_params in database.executed
+    )
+
+
+def test_organiser_rejects_admin_summary():
+    with pytest.raises(HTTPException) as error:
+        dashboard_module.get_organiser_summary(
+            {"id": 1, "role": "ADMIN"}
+        )
+    assert error.value.status_code == 403
+
+
+def test_organiser_bookings_are_owner_scoped(monkeypatch):
+    database = FakeDatabase(fetchall_value=[
+        {"booking_id": 9, "event_id": 3}
+    ])
+    monkeypatch.setattr(
+        dashboard_module,
+        "get_db_connection",
+        lambda: database
+    )
+
+    response = dashboard_module.get_organiser_bookings(
+        event_id=3,
+        status="CONFIRMED",
+        current_user={"id": 25, "role": "ORGANISER"}
+    )
+
+    assert response["total"] == 1
+    query, params = database.executed[0]
+    assert "e.created_by = %s" in query
+    assert params == (25, 3, "CONFIRMED")
+
+
+def test_unpublish_rejects_event_with_existing_bookings(monkeypatch):
+    database = FakeDatabase(
+        fetchone_values=[
+            {"id": 3, "status": "PUBLISHED", "created_by": 25},
+            {"booking_count": 2}
+        ]
+    )
+    monkeypatch.setattr(
+        events_module,
+        "get_db_connection",
+        lambda: database
+    )
+
+    with pytest.raises(HTTPException) as error:
+        events_module.unpublish_event(
+            3,
+            {"id": 25, "role": "ORGANISER"}
+        )
+
+    assert error.value.status_code == 409
+
+
+def test_failed_simulated_payment_creates_no_success_tickets():
+    with open(
+        "app/agents/booking_agent.py",
+        "r",
+        encoding="utf-8"
+    ) as source_file:
+        source = source_file.read()
+
+    assert 'payment_result not in {"SUCCESS", "FAILED"}' in source
+    assert 'payment_result == "SUCCESS"' in source
+    assert 'payment_status = payment_result' in source or (
+        '"payment_status": payment_result' in source
+    )
+
+
+def test_successful_simulated_payment_route(monkeypatch):
+    class PaymentBus:
+        def send(self, message):
+            assert message.content["action"] == "PROCESS_PAYMENT"
+            return ACLMessage(
+                sender="BookingAgent",
+                receiver="BookingAPI",
+                performative=Performative.AGREE,
+                conversation_id=message.conversation_id,
+                content={
+                    "booking_id": 42,
+                    "booking_status": "CONFIRMED",
+                    "payment_status": "SUCCESS",
+                    "tickets": [{"ticket_id": 1}]
+                }
+            )
+
+    monkeypatch.setattr(
+        dependencies_module,
+        "get_user_from_token",
+        lambda token: {"id": 184, "role": "ATTENDEE"}
+    )
+
+    with client:
+        app.state.agent_runtime = {"message_bus": PaymentBus()}
+        response = client.post(
+            "/bookings/42/payment",
+            headers={"Authorization": "Bearer valid-attendee-token"},
+            json={
+                "payment_result": "SUCCESS",
+                "category_id": 2
+            }
+        )
+
+    assert response.status_code == 200
+    assert response.json()["payment_status"] == "SUCCESS"
+
+
+def test_failed_simulated_payment_route(monkeypatch):
+    class PaymentBus:
+        def send(self, message):
+            return ACLMessage(
+                sender="BookingAgent",
+                receiver="BookingAPI",
+                performative=Performative.AGREE,
+                conversation_id=message.conversation_id,
+                content={
+                    "booking_id": 42,
+                    "booking_status": "PENDING",
+                    "payment_status": "FAILED",
+                    "tickets": []
+                }
+            )
+
+    monkeypatch.setattr(
+        dependencies_module,
+        "get_user_from_token",
+        lambda token: {"id": 184, "role": "ATTENDEE"}
+    )
+
+    with client:
+        app.state.agent_runtime = {"message_bus": PaymentBus()}
+        response = client.post(
+            "/bookings/42/payment",
+            headers={"Authorization": "Bearer valid-attendee-token"},
+            json={
+                "payment_result": "FAILED",
+                "category_id": 2
+            }
+        )
+
+    assert response.status_code == 200
+    assert response.json()["payment_status"] == "FAILED"
+    assert response.json()["tickets"] == []
+
+
+def test_organiser_dashboard_page_route():
+    response = client.get("/ui/organiser/dashboard")
+    assert response.status_code == 200
+    assert b"Organiser Dashboard" in response.content
+
+
+def test_organiser_dashboard_frontend_uses_real_api():
+    with open(
+        "app/static/js/organiser-dashboard.js",
+        "r",
+        encoding="utf-8"
+    ) as script_file:
+        script = script_file.read()
+
+    assert "/dashboard/organiser/summary" in script
+    assert "/dashboard/organiser/bookings" in script
 
 
 class FakeDatabase:

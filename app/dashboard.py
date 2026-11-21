@@ -158,3 +158,185 @@ def get_recent_bookings(current_user=Depends(get_current_user)):
         "total": len(bookings),
         "bookings": bookings
     }
+
+
+@router.get("/organiser/summary")
+def get_organiser_summary(
+    current_user=Depends(get_current_user)
+):
+    if current_user["role"] != "ORGANISER":
+        raise HTTPException(
+            status_code=403,
+            detail="Organiser access required"
+        )
+
+    organiser_id = current_user["id"]
+
+    with get_db_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    COUNT(*) AS total_events,
+                    COUNT(*) FILTER (
+                        WHERE status = 'PUBLISHED'
+                    ) AS published_events,
+                    COUNT(*) FILTER (
+                        WHERE status = 'DRAFT'
+                    ) AS draft_events,
+                    COUNT(*) FILTER (
+                        WHERE status = 'CANCELLED'
+                    ) AS cancelled_events
+                FROM events
+                WHERE created_by = %s
+                """,
+                (organiser_id,)
+            )
+            event_stats = cursor.fetchone()
+
+            cursor.execute(
+                """
+                SELECT
+                    COUNT(DISTINCT b.id) AS total_bookings,
+                    COUNT(DISTINCT b.id) FILTER (
+                        WHERE b.status = 'CONFIRMED'
+                    ) AS confirmed_bookings,
+                    COUNT(t.id) AS total_tickets,
+                    COUNT(t.id) FILTER (
+                        WHERE t.status IN ('VALID', 'USED')
+                    ) AS active_tickets
+                FROM events e
+                LEFT JOIN bookings b ON b.event_id = e.id
+                LEFT JOIN tickets t ON t.booking_id = b.id
+                WHERE e.created_by = %s
+                """,
+                (organiser_id,)
+            )
+            booking_stats = cursor.fetchone()
+
+            cursor.execute(
+                """
+                SELECT COALESCE(SUM(p.amount), 0) AS total_revenue
+                FROM payments p
+                JOIN bookings b ON b.id = p.booking_id
+                JOIN events e ON e.id = b.event_id
+                WHERE e.created_by = %s
+                  AND p.status = 'SUCCESS'
+                """,
+                (organiser_id,)
+            )
+            revenue = cursor.fetchone()
+
+            cursor.execute(
+                """
+                SELECT
+                    b.id AS booking_id,
+                    b.quantity,
+                    b.total_amount,
+                    b.status AS booking_status,
+                    b.created_at,
+                    e.id AS event_id,
+                    e.title AS event_title,
+                    u.full_name AS attendee_name,
+                    u.email AS attendee_email,
+                    p.status AS payment_status
+                FROM bookings b
+                JOIN events e ON e.id = b.event_id
+                JOIN users u ON u.id = b.user_id
+                LEFT JOIN LATERAL (
+                    SELECT status
+                    FROM payments
+                    WHERE booking_id = b.id
+                    ORDER BY id DESC
+                    LIMIT 1
+                ) p ON TRUE
+                WHERE e.created_by = %s
+                ORDER BY b.created_at DESC
+                LIMIT 10
+                """,
+                (organiser_id,)
+            )
+            recent_bookings = cursor.fetchall()
+
+    return {
+        "total_events": event_stats["total_events"],
+        "published_events": event_stats["published_events"],
+        "draft_events": event_stats["draft_events"],
+        "cancelled_events": event_stats["cancelled_events"],
+        "total_bookings": booking_stats["total_bookings"],
+        "confirmed_bookings": booking_stats["confirmed_bookings"],
+        "total_tickets": booking_stats["total_tickets"],
+        "active_tickets": booking_stats["active_tickets"],
+        "total_revenue": float(revenue["total_revenue"]),
+        "recent_bookings": recent_bookings
+    }
+
+
+@router.get("/organiser/bookings")
+def get_organiser_bookings(
+    event_id: int | None = None,
+    status: str | None = None,
+    current_user=Depends(get_current_user)
+):
+    if current_user["role"] != "ORGANISER":
+        raise HTTPException(
+            status_code=403,
+            detail="Organiser access required"
+        )
+
+    filters = ["e.created_by = %s"]
+    params = [current_user["id"]]
+
+    if event_id is not None:
+        filters.append("e.id = %s")
+        params.append(event_id)
+    if status:
+        filters.append("b.status = %s")
+        params.append(status.upper())
+
+    where_clause = " AND ".join(filters)
+
+    with get_db_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"""
+                SELECT
+                    b.id AS booking_id,
+                    b.quantity,
+                    b.total_amount,
+                    b.status AS booking_status,
+                    b.created_at,
+                    e.id AS event_id,
+                    e.title AS event_title,
+                    u.id AS attendee_id,
+                    u.full_name AS attendee_name,
+                    u.email AS attendee_email,
+                    p.status AS payment_status,
+                    p.payment_reference,
+                    COUNT(t.id) AS ticket_count
+                FROM bookings b
+                JOIN events e ON e.id = b.event_id
+                JOIN users u ON u.id = b.user_id
+                LEFT JOIN LATERAL (
+                    SELECT status, payment_reference
+                    FROM payments
+                    WHERE booking_id = b.id
+                    ORDER BY id DESC
+                    LIMIT 1
+                ) p ON TRUE
+                LEFT JOIN tickets t ON t.booking_id = b.id
+                WHERE {where_clause}
+                GROUP BY
+                    b.id, b.quantity, b.total_amount, b.status, b.created_at,
+                    e.id, e.title, u.id, u.full_name, u.email,
+                    p.status, p.payment_reference
+                ORDER BY b.created_at DESC
+                """,
+                tuple(params)
+            )
+            bookings = cursor.fetchall()
+
+    return {
+        "total": len(bookings),
+        "bookings": bookings
+    }

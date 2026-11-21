@@ -17,8 +17,27 @@ function formatDate(value) {
 function statusClass(status) {
     return {
         WAITING: "warning", FULFILLED: "success",
-        EXPIRED: "secondary", CANCELLED: "dark"
+        OFFERED: "primary", EXPIRED: "secondary", CANCELLED: "dark"
     }[status] || "secondary";
+}
+
+async function leaveWaitlist(waitlistId, button) {
+    if (!confirm("Leave this waitlist?")) return;
+    button.disabled = true;
+    try {
+        const response = await fetch(`/waitlist/${waitlistId}`, {
+            method: "DELETE",
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.detail || "Could not leave waitlist.");
+        await loadWaitlist();
+    } catch (error) {
+        button.disabled = false;
+        const message = document.getElementById("pageMessage");
+        message.textContent = error.message;
+        message.className = "alert alert-danger";
+    }
 }
 
 async function loadWaitlist() {
@@ -46,10 +65,23 @@ async function loadWaitlist() {
                     <h2 class="h5">${escapeHTML(entry.event_title || `Event #${entry.event_id}`)}</h2>
                     <p class="mb-1"><strong>Quantity:</strong> ${escapeHTML(entry.quantity)}</p>
                     <p class="mb-1"><strong>Joined:</strong> ${escapeHTML(formatDate(entry.created_at))}</p>
+                    ${entry.queue_position ? `<p class="mb-1"><strong>Queue position:</strong> ${escapeHTML(entry.queue_position)}</p>` : ""}
                     <span class="badge text-bg-${statusClass(entry.status)}">${escapeHTML(entry.status)}</span>
+                    ${["WAITING", "OFFERED"].includes(entry.status) ? `
+                        <button class="btn btn-outline-danger btn-sm w-100 mt-3 leave-waitlist"
+                                type="button"
+                                data-waitlist-id="${Number(entry.waitlist_id)}">
+                            Leave Waitlist
+                        </button>` : ""}
                 </div>
             </article>
         </div>`).join("");
+
+    document.querySelectorAll(".leave-waitlist").forEach(button => {
+        button.addEventListener("click", () => {
+            leaveWaitlist(Number(button.dataset.waitlistId), button);
+        });
+    });
 }
 
 document.getElementById("logoutButton").addEventListener("click", () => {
