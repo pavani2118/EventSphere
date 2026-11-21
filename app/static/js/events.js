@@ -41,7 +41,7 @@ async function loadEvents() {
         loading.classList.add("d-none");
 
         populateCategories();
-        displayEvents(allEvents);
+        filterEvents();
 
     } catch (error) {
         loading.textContent = error.message;
@@ -61,6 +61,19 @@ function populateCategories() {
 
         categoryFilter.appendChild(option);
     });
+
+    const requestedCategory =
+        new URLSearchParams(window.location.search).get("category");
+
+    if (requestedCategory) {
+        const matchingCategory = categories.find(
+            category => category.toLowerCase() === requestedCategory.toLowerCase()
+        );
+
+        if (matchingCategory) {
+            categoryFilter.value = matchingCategory;
+        }
+    }
 }
 
 function displayEvents(events) {

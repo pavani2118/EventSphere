@@ -161,6 +161,112 @@ if (logoutButton) {
                     }
                 });
             }
+
+
+            // HOME PAGE PUBLISHED EVENTS
+            const featuredEventsGrid = document.getElementById("featuredEventsGrid");
+            const featuredEventsLoading = document.getElementById("featuredEventsLoading");
+            const featuredEventsEmpty = document.getElementById("featuredEventsEmpty");
+
+            function escapeHomeText(value) {
+                return String(value ?? "").replace(/[&<>"']/g, character => ({
+                    "&": "&amp;",
+                    "<": "&lt;",
+                    ">": "&gt;",
+                    '"': "&quot;",
+                    "'": "&#039;"
+                })[character]);
+            }
+
+            function formatHomeEventDate(value) {
+                if (!value) return "Date to be announced";
+
+                return new Date(value).toLocaleString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit"
+                });
+            }
+
+            async function loadFeaturedEvents() {
+                if (!featuredEventsGrid) return;
+
+                try {
+                    const response = await fetch("/events/");
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.detail || "Unable to load published events.");
+                    }
+
+                    const events = Array.isArray(data.events)
+                        ? data.events.slice(0, 6)
+                        : [];
+
+                    featuredEventsLoading.classList.add("d-none");
+
+                    if (events.length === 0) {
+                        featuredEventsEmpty.classList.remove("d-none");
+                        return;
+                    }
+
+                    featuredEventsGrid.classList.remove("d-none");
+                    featuredEventsGrid.innerHTML = "";
+
+                    events.forEach(event => {
+                        const card = document.createElement("div");
+                        card.className = "col-md-6 col-lg-4";
+
+                        const availableImage =
+                            event.image_path ||
+                            event.image_url ||
+                            event.image ||
+                            null;
+
+                        const visual = availableImage
+                            ? `<img src="${escapeHomeText(availableImage)}"
+                                    alt="${escapeHomeText(event.title || "Event")}"
+                                    class="home-event-image"
+                                    loading="lazy">`
+                            : `<div class="home-event-placeholder" aria-hidden="true">
+                                    <i class="bi bi-calendar2-event"></i>
+                               </div>`;
+
+                        card.innerHTML = `
+                            <article class="home-event-card">
+                                <div class="home-event-media">
+                                    ${visual}
+                                    <span class="home-event-category">
+                                        ${escapeHomeText(event.category || "Event")}
+                                    </span>
+                                </div>
+                                <div class="home-event-body">
+                                    <h3>${escapeHomeText(event.title || "Untitled event")}</h3>
+                                    <div class="home-event-meta">
+                                        <span><i class="bi bi-geo-alt"></i>${escapeHomeText(event.venue_name || "Venue to be announced")}</span>
+                                        <span><i class="bi bi-calendar3"></i>${escapeHomeText(formatHomeEventDate(event.start_time))}</span>
+                                    </div>
+                                    <a class="btn home-event-button"
+                                       href="/ui/event/${encodeURIComponent(Number(event.id))}">
+                                        View Details<i class="bi bi-arrow-right"></i>
+                                    </a>
+                                </div>
+                            </article>
+                        `;
+
+                        featuredEventsGrid.appendChild(card);
+                    });
+                } catch (error) {
+                    featuredEventsLoading.classList.add("d-none");
+                    featuredEventsEmpty.classList.remove("d-none");
+                    featuredEventsEmpty.querySelector("p").textContent =
+                        error.message || "Published events could not be loaded.";
+                }
+            }
+
+            loadFeaturedEvents();
         } finally {
             sessionStorage.removeItem("access_token");
             sessionStorage.removeItem("user");
