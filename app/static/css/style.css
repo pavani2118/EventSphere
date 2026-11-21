@@ -609,6 +609,263 @@ footer small {
         padding-left: 1rem;
     }
 
+    /* Shared navigation alignment */
+    .navbar-expand-lg .navbar-collapse {
+        flex: 1 1 auto;
+    }
+
+    .navbar-expand-lg .navbar-nav {
+        flex-wrap: nowrap;
+        white-space: nowrap;
+    }
+
+    .navbar-expand-lg .navbar-nav .nav-link {
+        padding-inline: 0.65rem !important;
+    }
+
+    .navbar-expand-lg .navbar-nav .btn {
+        min-height: 38px;
+        margin-left: 0.35rem;
+    }
+
+    .navbar .navbar-brand {
+        flex: 0 0 auto;
+    }
+
+    @media (max-width: 991.98px) {
+        .navbar-expand-lg .navbar-collapse {
+            width: 100%;
+        }
+
+        .navbar-expand-lg .navbar-nav {
+            flex-wrap: wrap;
+            white-space: normal;
+        }
+
+        .navbar-expand-lg .navbar-nav .btn {
+            margin-left: 0;
+        }
+    }
+
+    /* Management table action alignment */
+    .management-table {
+        table-layout: fixed;
+        min-width: 980px;
+    }
+
+    .management-table th:nth-child(1) { width: 190px; }
+    .management-table th:nth-child(2) { width: 120px; }
+    .management-table th:nth-child(3) { width: 150px; }
+    .management-table th:nth-child(4) { width: 155px; }
+    .management-table th:nth-child(5) { width: 105px; }
+    .management-table th:nth-child(6) { width: 300px; }
+
+    .management-actions {
+        width: 300px;
+        min-width: 300px;
+        justify-content: flex-start;
+        flex-wrap: nowrap;
+        gap: 0.5rem;
+    }
+
+    .management-actions .btn {
+        height: 38px;
+        min-height: 38px;
+    }
+
+    .venue-actions {
+        width: 170px;
+        min-width: 170px;
+    }
+
+    .venue-actions .btn {
+        height: 38px;
+        min-height: 38px;
+    }
+
+    @media (max-width: 575.98px) {
+        .management-table {
+            min-width: 940px;
+        }
+
+        .management-actions,
+        .venue-actions {
+            justify-content: flex-start;
+        }
+    }
+
+    /* Agent activity dashboard */
+    .stat-icon,
+    .agent-overview-icon {
+        background: var(--light-blue);
+        color: var(--teal-dark);
+    }
+
+    .agent-overview-card {
+        min-height: 112px;
+    }
+
+    .agent-overview-card .card-body {
+        position: relative;
+        min-width: 0;
+        padding: 1rem;
+    }
+
+    .agent-overview-card h6 {
+        max-width: calc(100% - 38px);
+        margin: 0 0 0.35rem;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 0.78rem;
+    }
+
+    .agent-overview-icon {
+        position: absolute;
+        top: 0.85rem;
+        right: 0.85rem;
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border-radius: 10px;
+    }
+
+    .agent-log-toolbar {
+        background: #f8fafc;
+    }
+
+    .agent-log-table {
+        min-width: 100%;
+    }
+
+    .agent-log-table table {
+        table-layout: fixed;
+        min-width: 920px;
+    }
+
+    .agent-log-table th:nth-child(1) { width: 150px; }
+    .agent-log-table th:nth-child(2) { width: 150px; }
+    .agent-log-table th:nth-child(3) { width: 125px; }
+    .agent-log-table th:nth-child(4) { width: 280px; }
+    .agent-log-table th:nth-child(5) { width: 145px; }
+    .agent-log-table th:nth-child(6) { width: 125px; }
+
+    .agent-name {
+        white-space: nowrap;
+        font-weight: 700;
+    }
+
+    .agent-summary {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .agent-timestamp {
+        white-space: nowrap;
+    }
+
+    .agent-timestamp span,
+    .agent-timestamp small {
+        display: block;
+    }
+
+    .agent-timestamp small {
+        color: var(--muted);
+    }
+
+    .agent-actions {
+        text-align: right;
+    }
+
+    .agent-actions .btn {
+        min-height: 38px;
+        height: 38px;
+        white-space: nowrap;
+    }
+
+    .performative-badge {
+        display: inline-flex;
+        align-items: center;
+        min-height: 24px;
+        border-radius: 999px;
+        padding: 0.28rem 0.55rem;
+        font-size: 0.68rem;
+        font-weight: 800;
+        line-height: 1;
+        white-space: nowrap;
+    }
+
+    .performative-agree,
+    .performative-confirm {
+        background: #dcfce7;
+        color: #166534;
+    }
+
+    .performative-inform,
+    .performative-request,
+    .performative-propose {
+        background: #dbeafe;
+        color: #1d4ed8;
+    }
+
+    .performative-refuse,
+    .performative-failure {
+        background: #fee2e2;
+        color: #991b1b;
+    }
+
+    .performative-unknown {
+        background: #f1f5f9;
+        color: var(--navy-soft);
+    }
+
+    .agent-details-meta {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75rem;
+    }
+
+    .agent-details-meta > div {
+        min-width: 0;
+        padding: 0.75rem;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: #f8fafc;
+    }
+
+    .agent-details-meta strong,
+    .agent-details-meta span {
+        display: block;
+    }
+
+    .agent-details-meta strong {
+        margin-bottom: 0.25rem;
+        color: var(--muted);
+        font-size: 0.72rem;
+        text-transform: uppercase;
+    }
+
+    .agent-details-json {
+        max-height: 420px;
+        overflow: auto;
+        margin: 0;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: #f8fafc;
+        color: var(--navy);
+        padding: 1rem;
+        white-space: pre-wrap;
+        word-break: break-word;
+    }
+
+    @media (max-width: 575.98px) {
+        .agent-details-meta {
+            grid-template-columns: 1fr;
+        }
+    }
+
     .page-breadcrumb {
         margin-bottom: 0;
         font-size: 0.82rem;

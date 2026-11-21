@@ -180,15 +180,28 @@ document.getElementById("venueForm").addEventListener("submit", async function(e
 });
 
 async function deleteVenue(id) {
-    if (!confirm("Are you sure you want to delete this venue?")) return;
+    window.pendingVenueDeleteId = id;
+    bootstrap.Modal.getOrCreateInstance(
+        document.getElementById("deleteVenueModal")
+    ).show();
+}
 
+document.getElementById("confirmDeleteVenue").addEventListener("click", async function() {
+    const id = window.pendingVenueDeleteId;
+    if (!id) return;
+
+    this.disabled = true;
     try {
         await apiRequest(`${API_URL}/${id}`, { method: "DELETE" });
+        bootstrap.Modal.getInstance(document.getElementById("deleteVenueModal")).hide();
         showMessage("Venue deleted successfully!");
         await loadVenues();
     } catch (error) {
         showMessage(error.message, "danger");
+    } finally {
+        this.disabled = false;
+        window.pendingVenueDeleteId = null;
     }
-}
+});
 
 loadVenues();
