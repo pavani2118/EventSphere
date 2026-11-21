@@ -866,6 +866,141 @@ footer small {
         }
     }
 
+    /* Final management navbar and action layout fixes */
+    @media (min-width: 992px) {
+        .navbar-expand-lg > .container {
+            flex-wrap: nowrap;
+        }
+
+        .navbar-expand-lg .navbar-collapse {
+            display: flex !important;
+            flex-basis: auto;
+            justify-content: flex-end;
+        }
+
+        .navbar-expand-lg .navbar-nav {
+            width: auto;
+            flex-wrap: nowrap;
+            align-items: center;
+            white-space: nowrap;
+        }
+
+        .navbar-expand-lg .navbar-nav .nav-link {
+            min-height: 38px;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .navbar-expand-lg .navbar-nav .btn {
+            flex: 0 0 auto;
+            margin-left: 0.35rem;
+        }
+    }
+
+    .management-table {
+        table-layout: fixed;
+    }
+
+    .management-table th:nth-child(6),
+    .management-table td:nth-child(6) {
+        vertical-align: middle;
+    }
+
+    .management-actions {
+        width: 310px;
+        min-width: 310px;
+        display: flex !important;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0.5rem;
+    }
+
+    .management-actions .btn {
+        height: 38px;
+        min-height: 38px;
+        margin: 0 !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        white-space: nowrap;
+    }
+
+    .management-table th:nth-child(6) {
+        width: 310px;
+    }
+
+    .venue-management-table th:nth-child(6),
+    .venue-management-table td:nth-child(6) {
+        width: 180px;
+    }
+
+    .venue-actions {
+        width: 180px;
+        min-width: 180px;
+        display: flex !important;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0.5rem;
+    }
+
+    .venue-actions .btn {
+        height: 38px;
+        min-height: 38px;
+        margin: 0 !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        white-space: nowrap;
+    }
+
+    .management-table th:nth-child(6),
+    .venue-actions {
+        text-align: left;
+    }
+
+    @media (max-width: 575.98px) {
+        .management-actions {
+            width: 150px;
+            min-width: 150px;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.35rem;
+        }
+
+        .management-actions .btn {
+            width: 100%;
+        }
+
+        .venue-actions {
+            width: 150px;
+            min-width: 150px;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 0.35rem;
+        }
+
+        .venue-actions .btn {
+            width: 100%;
+        }
+
+        .management-table th:nth-child(6),
+        .management-table td:nth-child(6) {
+            width: 150px;
+        }
+
+        .page-heading {
+            align-items: flex-start !important;
+        }
+
+        .page-heading > .btn {
+            width: 100%;
+        }
+    }
+
     .page-breadcrumb {
         margin-bottom: 0;
         font-size: 0.82rem;
