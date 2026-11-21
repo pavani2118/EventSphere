@@ -1,4 +1,7 @@
 
+import os
+import pytest
+
 from app.agents.message import ACLMessage, Performative
 from app.agents.message_bus import MessageBus
 from app.agents.base_agent import BaseAgent
@@ -134,6 +137,8 @@ def test_message_bus_returns_failure_when_receiver_raises():
 
 
 def test_agent_state_persistence():
+    if not os.getenv("EVENTSPHERE_TEST_DATABASE"):
+        pytest.skip("Set EVENTSPHERE_TEST_DATABASE=1 only for an isolated test database.")
 
     bus = MessageBus()
 

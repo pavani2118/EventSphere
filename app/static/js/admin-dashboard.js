@@ -45,6 +45,11 @@ function formatDate(value) {
     return Number.isNaN(date.getTime()) ? "N/A" : date.toLocaleString();
 }
 
+function statusBadge(value) {
+    const status = String(value || "UNKNOWN").toUpperCase();
+    return `<span class="status-badge status-${status.toLowerCase()}">${escapeHTML(status)}</span>`;
+}
+
 async function loadSummary() {
     const data = await apiGet("/dashboard/admin/summary");
 
@@ -70,7 +75,7 @@ async function loadRecentEvents() {
     const table = document.getElementById("eventTable");
 
     if (!data.events.length) {
-        table.innerHTML = `<tr><td colspan="5">No events found.</td></tr>`;
+        table.innerHTML = `<tr><td colspan="5"><div class="dashboard-empty"><i class="bi bi-calendar2-x"></i>No recent events found.</div></td></tr>`;
         return;
     }
 
@@ -80,7 +85,7 @@ async function loadRecentEvents() {
             <td>${escapeHTML(event.category)}</td>
             <td>${escapeHTML(event.venue_name || "N/A")}</td>
             <td>${escapeHTML(formatDate(event.start_time))}</td>
-            <td>${escapeHTML(event.status)}</td>
+            <td>${statusBadge(event.status)}</td>
         </tr>
     `).join("");
 }
@@ -90,7 +95,7 @@ async function loadAgentMessages() {
     const table = document.getElementById("agentTable");
 
     if (!data.messages.length) {
-        table.innerHTML = `<tr><td colspan="5">No agent messages found.</td></tr>`;
+        table.innerHTML = `<tr><td colspan="5"><div class="dashboard-empty"><i class="bi bi-chat-square-text"></i>No agent activity has been recorded.</div></td></tr>`;
         return;
     }
 
@@ -118,7 +123,7 @@ async function loadRecentBookings() {
     const table = document.getElementById("bookingTable");
 
     if (!data.bookings.length) {
-        table.innerHTML = `<tr><td colspan="6">No bookings found.</td></tr>`;
+        table.innerHTML = `<tr><td colspan="6"><div class="dashboard-empty"><i class="bi bi-journal-x"></i>No recent bookings found.</div></td></tr>`;
         return;
     }
 
@@ -128,7 +133,7 @@ async function loadRecentBookings() {
             <td>${escapeHTML(booking.event_title)}</td>
             <td>${escapeHTML(booking.quantity)}</td>
             <td>LKR ${escapeHTML(booking.total_amount)}</td>
-            <td>${escapeHTML(booking.status)}</td>
+            <td>${statusBadge(booking.status)}</td>
             <td>${escapeHTML(formatDate(booking.created_at))}</td>
         </tr>
     `).join("");

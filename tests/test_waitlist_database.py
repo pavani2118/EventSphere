@@ -43,8 +43,8 @@ def test_expire_waitlist_updates_only_old_entries(monkeypatch):
     test_ids = []
     test_connection = None
 
-    if not os.getenv("PGPASSWORD"):
-        pytest.skip("PostgreSQL environment variables are not configured.")
+    if not os.getenv("EVENTSPHERE_TEST_DATABASE"):
+        pytest.skip("Set EVENTSPHERE_TEST_DATABASE=1 only for an isolated test database.")
 
     try:
         # Find a published event and two active attendees who do not already

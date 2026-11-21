@@ -27,7 +27,7 @@ def scanner_page():
 
         <link
           rel="stylesheet"
-          href="/static/css/style.css?v=4">
+          href="/static/css/style.css?v=5">
 
         <script src="https://unpkg.com/html5-qrcode"></script>
     </head>

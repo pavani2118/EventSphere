@@ -1,14 +1,19 @@
 
 import uuid
 
+import pytest
 from fastapi.testclient import TestClient
 from app.main import app
 
 
 client = TestClient(app)
 
+pytestmark = pytest.mark.integration
+
 
 def create_test_user():
+    if not __import__("os").getenv("EVENTSPHERE_TEST_DATABASE"):
+        pytest.skip("Set EVENTSPHERE_TEST_DATABASE=1 only for an isolated test database.")
     email = f"test_{uuid.uuid4().hex[:10]}@example.com"
 
     response = client.post(

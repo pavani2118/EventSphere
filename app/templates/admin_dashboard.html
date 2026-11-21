@@ -6,32 +6,37 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Admin Dashboard | EventSphere</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=4">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=5">
 </head>
 <body class="bg-light">
 
-<nav class="navbar navbar-dark bg-dark">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container">
         <a class="navbar-brand" href="/ui/admin">EventSphere Admin</a>
-
-        <div class="d-flex flex-wrap gap-2 align-items-center">
-            <a class="btn btn-outline-light btn-sm" href="/ui/admin">Dashboard</a>
-            <a class="btn btn-outline-light btn-sm" href="/ui/manage-venues">Manage Venues</a>
-            <a class="btn btn-outline-light btn-sm" href="/ui/manage-events">Manage Events</a>
-            <a class="btn btn-outline-light btn-sm" href="/ui/events">Browse Events</a>
-            <a class="btn btn-outline-light btn-sm" href="/ui/my-tickets">My Tickets</a>
-            <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminNavbar" aria-controls="adminNavbar" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="adminNavbar">
+            <div class="navbar-nav ms-lg-auto align-items-lg-center gap-lg-1">
+                <a class="nav-link active" href="/ui/admin"><i class="bi bi-speedometer2"></i> Dashboard</a>
+                <a class="nav-link" href="/ui/manage-venues"><i class="bi bi-building"></i> Venues</a>
+                <a class="nav-link" href="/ui/manage-events"><i class="bi bi-calendar-event"></i> Events</a>
+                <a class="nav-link" href="/ui/events"><i class="bi bi-ticket-perforated"></i> Browse</a>
+                <button class="btn btn-outline-light btn-sm ms-lg-2" onclick="logout()">Logout</button>
+            </div>
         </div>
     </div>
 </nav>
 
 <div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <div class="dashboard-header d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
         <div>
-            <h2>Admin Dashboard</h2>
+            <span class="section-kicker">Administration</span>
+            <h1 class="h2 mb-1">Admin Dashboard</h1>
             <p class="text-muted mb-0">System overview and agent activity</p>
         </div>
-        <button class="btn btn-primary" onclick="loadDashboard()">Refresh</button>
+        <button class="btn btn-primary" onclick="loadDashboard()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh</button>
     </div>
 
     <div id="errorMessage" class="alert alert-danger d-none"></div>
@@ -39,55 +44,61 @@
     <h5 class="mb-3">System Statistics</h5>
 
     <div class="row g-3 mb-4">
-        <div class="col-6 col-lg-3">
-            <div class="card shadow-sm"><div class="card-body">
+        <div class="col-6 col-xl-3">
+            <div class="card stat-card h-100"><div class="card-body">
+                <span class="stat-icon"><i class="bi bi-people"></i></span>
                 <p class="text-muted mb-1">Total Users</p>
-                <h3 id="totalUsers">-</h3>
+                <h3 id="totalUsers" class="mb-0">-</h3>
             </div></div>
         </div>
 
-        <div class="col-6 col-lg-3">
-            <div class="card shadow-sm"><div class="card-body">
+        <div class="col-6 col-xl-3">
+            <div class="card stat-card h-100"><div class="card-body">
+                <span class="stat-icon"><i class="bi bi-building"></i></span>
                 <p class="text-muted mb-1">Venues</p>
-                <h3 id="totalVenues">-</h3>
+                <h3 id="totalVenues" class="mb-0">-</h3>
             </div></div>
         </div>
 
-        <div class="col-6 col-lg-3">
-            <div class="card shadow-sm"><div class="card-body">
+        <div class="col-6 col-xl-3">
+            <div class="card stat-card h-100"><div class="card-body">
+                <span class="stat-icon"><i class="bi bi-calendar2-event"></i></span>
                 <p class="text-muted mb-1">Events</p>
-                <h3 id="totalEvents">-</h3>
+                <h3 id="totalEvents" class="mb-0">-</h3>
                 <small class="text-muted" id="publishedEvents"></small>
             </div></div>
         </div>
 
-        <div class="col-6 col-lg-3">
-            <div class="card shadow-sm"><div class="card-body">
+        <div class="col-6 col-xl-3">
+            <div class="card stat-card h-100"><div class="card-body">
+                <span class="stat-icon"><i class="bi bi-journal-check"></i></span>
                 <p class="text-muted mb-1">Bookings</p>
-                <h3 id="totalBookings">-</h3>
+                <h3 id="totalBookings" class="mb-0">-</h3>
                 <small class="text-muted" id="confirmedBookings"></small>
             </div></div>
         </div>
 
-        <div class="col-6 col-lg-4">
-            <div class="card shadow-sm"><div class="card-body">
+        <div class="col-6 col-xl-4">
+            <div class="card stat-card h-100"><div class="card-body">
+                <span class="stat-icon"><i class="bi bi-currency-dollar"></i></span>
                 <p class="text-muted mb-1">Total Revenue</p>
-                <h3 id="totalRevenue">-</h3>
-                <small class="text-muted">LKR</small>
+                <h3 class="mb-0"><span id="totalRevenue">-</span> <small class="text-muted fs-6">LKR</small></h3>
             </div></div>
         </div>
 
-        <div class="col-6 col-lg-4">
-            <div class="card shadow-sm"><div class="card-body">
+        <div class="col-6 col-xl-4">
+            <div class="card stat-card h-100"><div class="card-body">
+                <span class="stat-icon"><i class="bi bi-ticket-perforated"></i></span>
                 <p class="text-muted mb-1">Tickets Sold</p>
-                <h3 id="totalTickets">-</h3>
+                <h3 id="totalTickets" class="mb-0">-</h3>
             </div></div>
         </div>
 
-        <div class="col-12 col-lg-4">
-            <div class="card shadow-sm"><div class="card-body">
+        <div class="col-12 col-xl-4">
+            <div class="card stat-card h-100"><div class="card-body">
+                <span class="stat-icon"><i class="bi bi-qr-code"></i></span>
                 <p class="text-muted mb-1">Checked-in Tickets</p>
-                <h3 id="checkedInTickets">-</h3>
+                <h3 id="checkedInTickets" class="mb-0">-</h3>
                 <small class="text-muted" id="capacityInfo"></small>
             </div></div>
         </div>
@@ -116,10 +127,10 @@
 
     <h5 class="mb-3">Agent Communication Logs</h5>
 
-    <div class="card shadow-sm">
+    <div class="card dashboard-table-card mb-4">
         <div class="table-responsive">
             <table class="table table-hover mb-0">
-                <thead class="table-dark">
+                <thead>
                     <tr>
                         <th>Sender</th>
                         <th>Receiver</th>
@@ -129,34 +140,35 @@
                     </tr>
                 </thead>
                 <tbody id="agentTable">
-                    <tr><td colspan="5">Loading messages...</td></tr>
+                    <tr><td colspan="5" class="text-center text-muted py-4">Loading agent activity...</td></tr>
                 </tbody>
             </table>
         </div>
+    </div>
 
-        <h5 class="mb-3 mt-4">Recent Bookings</h5>
-        <div class="card shadow-sm">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>Booking</th>
-                            <th>Event</th>
-                            <th>Quantity</th>
-                            <th>Amount</th>
-                            <th>Status</th>
-                            <th>Created</th>
-                        </tr>
-                    </thead>
-                    <tbody id="bookingTable">
-                        <tr><td colspan="6">Loading bookings...</td></tr>
-                    </tbody>
-                </table>
-            </div>
+    <h5 class="mb-3">Recent Bookings</h5>
+    <div class="card dashboard-table-card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Booking</th>
+                        <th>Event</th>
+                        <th>Quantity</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody id="bookingTable">
+                    <tr><td colspan="6" class="text-center text-muted py-4">Loading bookings...</td></tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="/static/js/admin-dashboard.js"></script>
 </body>
 </html>
