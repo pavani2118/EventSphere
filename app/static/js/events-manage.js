@@ -110,27 +110,39 @@ async function loadEvents() {
             const title = document.createElement("td");
             title.className = "event-name";
             title.textContent = event.title ?? "";
+            title.title = event.title ?? "";
 
             const category = document.createElement("td");
             category.className = "category-cell";
             category.textContent = event.category ?? "";
+            category.title = event.category ?? "";
 
             const venue = document.createElement("td");
             venue.className = "venue-cell";
             venue.textContent =
                 event.venue_name ?? event.venue_id ?? "—";
+            venue.title = venue.textContent;
 
             const date = document.createElement("td");
             date.className = "date-cell";
-            date.textContent = event.start_time
-                ? new Date(event.start_time).toLocaleString("en-US", {
+            if (event.start_time) {
+                const startDate = new Date(event.start_time);
+                const dateText = startDate.toLocaleDateString("en-US", {
                     year: "numeric",
                     month: "short",
-                    day: "2-digit",
+                    day: "2-digit"
+                });
+                const timeText = startDate.toLocaleTimeString("en-US", {
                     hour: "2-digit",
                     minute: "2-digit"
-                })
-                : "—";
+                });
+                date.innerHTML =
+                    `<span class="date-main">${dateText}</span>` +
+                    `<span class="date-time">${timeText}</span>`;
+                date.title = `${dateText}, ${timeText}`;
+            } else {
+                date.textContent = "—";
+            }
 
             const status = document.createElement("td");
             status.className = "status-cell";

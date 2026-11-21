@@ -1568,6 +1568,108 @@ div.container.py-4 > div:first-child h2 {
     .auth-card {
         max-width: 100%;
     }
+}
+
+/* Manage Events: clean, consistent desktop rows */
+.management-table {
+    width: 100%;
+    min-width: 980px;
+    table-layout: fixed;
+}
+
+.management-table th,
+.management-table td {
+    vertical-align: middle;
+}
+
+.management-table th:nth-child(1),
+.management-table td:nth-child(1) { width: 20%; }
+.management-table th:nth-child(2),
+.management-table td:nth-child(2) { width: 12%; }
+.management-table th:nth-child(3),
+.management-table td:nth-child(3) { width: 16%; }
+.management-table th:nth-child(4),
+.management-table td:nth-child(4) { width: 16%; }
+.management-table th:nth-child(5),
+.management-table td:nth-child(5) { width: 10%; }
+.management-table th:nth-child(6),
+.management-table td:nth-child(6) { width: 26%; }
+
+.management-table tbody tr {
+    height: 78px;
+}
+
+.management-table .event-name {
+    max-width: none;
+    min-width: 0;
+    line-height: 1.35;
+}
+
+.management-table .category-cell,
+.management-table .venue-cell {
+    max-width: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.management-table .date-cell {
+    min-width: 0;
+    white-space: normal;
+    line-height: 1.35;
+}
+
+.management-table .date-main,
+.management-table .date-time {
+    display: block;
+}
+
+.management-table .date-time {
+    color: var(--muted);
+    margin-top: 2px;
+    font-size: 0.82rem;
+}
+
+.management-table .status-cell {
+    min-width: 0;
+    text-align: center;
+}
+
+.management-table .status-badge {
+    white-space: nowrap;
+}
+
+.management-actions {
+    width: 100% !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.45rem;
+}
+
+.management-actions .btn {
+    min-width: 0;
+    min-height: 38px;
+    margin: 0 !important;
+    padding: 0.45rem 0.65rem;
+    white-space: nowrap;
+}
+
+.management-table .empty-row td {
+    height: auto;
+}
+
+@media (max-width: 991.98px) {
+    .management-table {
+        min-width: 900px;
+    }
+
+    .management-actions {
+        justify-content: flex-start;
+    }
 
     .auth-card .card-body {
         padding: 1.35rem !important;
@@ -2039,4 +2141,153 @@ div.container.py-4 > div:first-child h2 {
     align-items: center !important;
     justify-content: center !important;
     white-space: nowrap !important;
+}
+
+/* Professional top navigation */
+.navbar {
+    min-height: 82px;
+    background: #ffffff !important;
+}
+
+.navbar > .container,
+.navbar .container {
+    max-width: 1480px;
+}
+
+.navbar-brand {
+    flex: 0 0 auto;
+    margin-right: 1.75rem;
+}
+
+.navbar-collapse {
+    min-width: 0;
+}
+
+.navbar .navbar-nav {
+    min-width: 0;
+    flex-wrap: nowrap !important;
+    align-items: center;
+    gap: 0.2rem;
+}
+
+.navbar .navbar-nav .nav-link {
+    flex: 0 0 auto;
+    min-height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    padding: 0.48rem 0.58rem !important;
+    font-size: 0.82rem;
+}
+
+.navbar .navbar-nav .nav-link i {
+    margin-right: 0.32rem;
+}
+
+.navbar .navbar-nav > .btn,
+.navbar .navbar-nav > button {
+    flex: 0 0 auto;
+    min-height: 38px;
+    height: 38px;
+    margin: 0 0.14rem !important;
+    border-radius: 9px;
+    white-space: nowrap;
+}
+
+.navbar #dashboardLink {
+    border-color: var(--primary);
+    background: #eff6ff;
+    color: var(--primary) !important;
+    font-weight: 700;
+}
+
+.navbar #manageVenuesLink,
+.navbar .btn-outline-light {
+    border-color: #dbe3ef;
+    background: #f8fafc;
+    color: var(--navy) !important;
+}
+
+.navbar #manageEventsLink,
+.navbar .btn-warning {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: #ffffff !important;
+    font-weight: 700;
+}
+
+.navbar #manageEventsLink:hover,
+.navbar .btn-warning:hover {
+    border-color: var(--teal-dark);
+    background: var(--teal-dark);
+}
+
+.navbar #dashboardLink:hover,
+.navbar .btn-outline-light:hover {
+    border-color: var(--primary);
+    background: #eaf2ff;
+    color: var(--primary) !important;
+}
+
+.navbar #logoutButton,
+.navbar button[onclick="logout()"] {
+    border-color: #dc2626;
+    background: #dc2626;
+    color: #ffffff !important;
+}
+
+.navbar #userGreeting {
+    color: var(--navy-soft) !important;
+    max-width: 150px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 1199.98px) {
+    .navbar > .container,
+    .navbar .container {
+        max-width: 1180px;
+    }
+
+    .navbar .navbar-nav .nav-link {
+        padding-inline: 0.42rem !important;
+        font-size: 0.78rem;
+    }
+
+    .navbar .navbar-nav > .btn,
+    .navbar .navbar-nav > button {
+        padding-inline: 0.72rem;
+    }
+}
+
+@media (max-width: 991.98px) {
+    .navbar {
+        min-height: 64px;
+    }
+
+    .navbar .navbar-nav {
+        width: 100%;
+        margin-top: 0.75rem;
+        flex-wrap: wrap !important;
+        align-items: stretch;
+        gap: 0.35rem;
+    }
+
+    .navbar .navbar-nav .nav-link,
+    .navbar .navbar-nav > .btn,
+    .navbar .navbar-nav > button {
+        width: 100%;
+        height: auto;
+        min-height: 42px;
+        justify-content: flex-start;
+        margin: 0 !important;
+    }
+
+    .navbar #userGreeting {
+        width: 100%;
+        max-width: none;
+        padding: 0.4rem 0.55rem;
+    }
 }
