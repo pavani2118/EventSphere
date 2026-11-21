@@ -6,63 +6,80 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Manage Venues | EventSphere</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=5">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=7">
 </head>
 <body class="bg-light">
 
-<nav class="navbar navbar-dark bg-dark">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container">
-        <a class="navbar-brand" href="/ui">EventSphere</a>
-        <div>
-            <a href="/ui/admin" class="btn btn-outline-light btn-sm">Dashboard</a>
-            <button class="btn btn-danger btn-sm" onclick="logout()">Logout</button>
+        <a class="navbar-brand" href="/ui/admin">EventSphere Admin</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminNavbar">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="adminNavbar">
+            <div class="navbar-nav ms-lg-auto align-items-lg-center gap-lg-1">
+                <a class="nav-link" href="/ui/admin"><i class="bi bi-speedometer2"></i> Dashboard</a>
+                <a class="nav-link active" href="/ui/manage-venues"><i class="bi bi-building"></i> Manage Venues</a>
+                <a class="nav-link" href="/ui/manage-events"><i class="bi bi-calendar-event"></i> Manage Events</a>
+                <a class="nav-link" href="/ui/events"><i class="bi bi-ticket-perforated"></i> Browse Events</a>
+                <button class="btn btn-outline-light btn-sm ms-lg-2" onclick="logout()">Logout</button>
+            </div>
         </div>
     </div>
 </nav>
 
 <div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb page-breadcrumb">
+            <li class="breadcrumb-item"><a href="/ui/admin">Admin Dashboard</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Manage Venues</li>
+        </ol>
+    </nav>
+    <div class="page-heading d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
         <div>
-            <h2>Manage Venues</h2>
-            <p class="text-muted">Add and manage university event venues.</p>
+            <a class="back-link" href="/ui/admin"><i class="bi bi-arrow-left"></i> Back to Dashboard</a>
+            <h1 class="h2 mt-2 mb-1">Manage Venues</h1>
+            <p class="text-muted mb-0">Add, edit and review university event venues.</p>
         </div>
-        <button class="btn btn-primary" onclick="openAddForm()">+ Add Venue</button>
+        <button class="btn btn-primary" onclick="openAddForm()"><i class="bi bi-plus-lg me-1"></i> Add Venue</button>
     </div>
 
     <div id="message" class="alert d-none"></div>
 
     <div class="card shadow-sm mb-4" id="venueFormCard" style="display:none;">
         <div class="card-body">
+            <a class="back-link mb-2" href="/ui/manage-venues"><i class="bi bi-arrow-left"></i> Back to Manage Venues</a>
             <h5 id="formTitle">Add New Venue</h5>
             <form id="venueForm">
                 <input type="hidden" id="venueId">
 
                 <div class="row g-3">
                     <div class="col-md-6">
-                        <label class="form-label">Venue Name</label>
+                        <label class="form-label" for="venueName">Venue Name <span class="required-mark">*</span></label>
                         <input class="form-control" id="venueName" required>
                     </div>
                     <div class="col-md-6">
-                        <label class="form-label">Location</label>
+                        <label class="form-label" for="venueLocation">Location <span class="required-mark">*</span></label>
                         <input class="form-control" id="venueLocation" required>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">Capacity</label>
+                        <label class="form-label" for="venueCapacity">Capacity <span class="required-mark">*</span></label>
                         <input type="number" class="form-control" id="venueCapacity" min="1" required>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">Hourly Rate (LKR)</label>
+                        <label class="form-label" for="venueRate">Hourly Rate (LKR) <span class="required-mark">*</span></label>
                         <input type="number" class="form-control" id="venueRate" min="0" step="0.01" value="0" required>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label">Private Hire</label>
+                        <label class="form-label" for="privateHire">Private Hire</label>
                         <select class="form-select" id="privateHire">
                             <option value="true">Available</option>
                             <option value="false">Not Available</option>
                         </select>
                     </div>
                     <div class="col-12">
-                        <label class="form-label">Description</label>
+                        <label class="form-label" for="venueDescription">Description</label>
                         <textarea class="form-control" id="venueDescription" rows="3"></textarea>
                     </div>
                 </div>
@@ -80,7 +97,7 @@
             <h5 class="mb-3">Available Venues</h5>
             <div id="loading" class="text-center py-3">Loading venues...</div>
             <div class="table-responsive">
-                <table class="table table-hover align-middle">
+                <table class="table table-hover align-middle management-table">
                     <thead>
                         <tr>
                             <th>Name</th>
@@ -99,6 +116,7 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="/static/js/venues-manage.js"></script>
 </body>
 </html>

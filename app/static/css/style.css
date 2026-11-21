@@ -1,11 +1,14 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
 
 :root {
-    --navy: #14213d;
-    --navy-soft: #243b64;
-    --teal: #0d9488;
-    --teal-dark: #0f766e;
-    --page: #f8fafc;
+    --navy: #1e293b;
+    --navy-soft: #475569;
+    --primary: #2563eb;
+    --secondary-blue: #3b82f6;
+    --light-blue: #dbeafe;
+    --teal: #2563eb;
+    --teal-dark: #1d4ed8;
+    --page: #eff6ff;
     --surface: #ffffff;
     --ink: #1e293b;
     --muted: #64748b;
@@ -16,9 +19,9 @@
     --radius-sm: 10px;
     --radius-md: 16px;
     --radius-lg: 24px;
-    --shadow-sm: 0 2px 8px rgba(20, 33, 61, 0.06);
-    --shadow-md: 0 14px 35px rgba(20, 33, 61, 0.10);
-    --focus-ring: 0 0 0 4px rgba(13, 148, 136, 0.18);
+    --shadow-sm: 0 2px 8px rgba(37, 99, 235, 0.05);
+    --shadow-md: 0 12px 28px rgba(37, 99, 235, 0.09);
+    --focus-ring: 0 0 0 4px rgba(37, 99, 235, 0.14);
 }
 
 * {
@@ -55,9 +58,9 @@ a:hover {
 
 .navbar {
     min-height: 72px;
-    background: var(--navy) !important;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.10);
-    box-shadow: 0 4px 18px rgba(20, 33, 61, 0.12);
+    background: #fff !important;
+    border-bottom: 1px solid var(--border);
+    box-shadow: 0 2px 12px rgba(37, 99, 235, 0.05);
 }
 
 .navbar .container {
@@ -65,7 +68,7 @@ a:hover {
 }
 
 .navbar-brand {
-    color: #fff !important;
+    color: var(--navy) !important;
     font-size: 1.2rem;
     font-weight: 800 !important;
     letter-spacing: -0.03em;
@@ -79,7 +82,7 @@ a:hover {
     justify-content: center;
     margin-right: 0.55rem;
     border-radius: 9px;
-    background: var(--teal);
+    background: var(--primary);
     color: #fff;
     content: "E";
     font-size: 0.9rem;
@@ -87,7 +90,7 @@ a:hover {
 }
 
 .navbar .nav-link {
-    color: rgba(255, 255, 255, 0.76) !important;
+    color: var(--navy-soft) !important;
     border-radius: 8px;
     font-size: 0.86rem;
     font-weight: 500;
@@ -96,8 +99,8 @@ a:hover {
 
 .navbar .nav-link:hover,
 .navbar .nav-link.active {
-    color: #fff !important;
-    background: rgba(255, 255, 255, 0.10);
+    color: var(--primary) !important;
+    background: #eff6ff;
 }
 
 .navbar > .container > div:not(.collapse) {
@@ -108,8 +111,12 @@ a:hover {
 }
 
 .navbar-toggler {
-    border-color: rgba(255, 255, 255, 0.25);
+    border-color: var(--border);
     width: auto !important;
+}
+
+.navbar-toggler-icon {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='%231e293b' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e") !important;
 }
 
 .navbar-toggler:focus {
@@ -185,8 +192,24 @@ a:focus-visible {
 }
 
 .btn-secondary {
-    background: var(--navy-soft);
-    border-color: var(--navy-soft);
+    background: #fff;
+    border-color: var(--border);
+    color: var(--navy);
+}
+
+.btn-secondary:hover,
+.btn-secondary:focus {
+    background: #f8fafc;
+    border-color: #cbd5e1;
+    color: var(--navy);
+}
+
+.btn-dark,
+.btn-dark:hover,
+.btn-dark:focus {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
 }
 
 .btn-outline-primary {
@@ -201,7 +224,15 @@ a:focus-visible {
 }
 
 .btn-outline-light {
-    border-color: rgba(255, 255, 255, 0.35);
+    border-color: var(--border);
+    color: var(--navy) !important;
+}
+
+.btn-outline-light:hover,
+.btn-outline-light:focus {
+    background: var(--light-blue);
+    border-color: #bfdbfe;
+    color: var(--primary) !important;
 }
 
 .btn-success {
@@ -323,7 +354,7 @@ textarea.form-control {
 }
 
 .bg-dark {
-    background-color: var(--navy) !important;
+    background-color: #fff !important;
 }
 
 .bg-light {
@@ -333,8 +364,9 @@ textarea.form-control {
 .hero-section {
     position: relative;
     overflow: hidden;
-    background: var(--navy);
-    color: #fff;
+    background: var(--page);
+    color: var(--ink);
+    border-bottom: 1px solid var(--border);
     padding: 6.5rem 0 7rem;
 }
 
@@ -359,20 +391,20 @@ textarea.form-control {
 .hero-section h1,
 .hero-section h2 {
     max-width: 760px;
-    color: #fff;
+    color: var(--navy);
     font-size: clamp(2.4rem, 5vw, 4.5rem);
     line-height: 1.05;
 }
 
 .hero-section .lead {
     max-width: 650px;
-    color: rgba(255, 255, 255, 0.74);
+    color: var(--muted);
     font-size: 1.08rem;
 }
 
 .hero-section .badge {
-    background: rgba(94, 234, 212, 0.14) !important;
-    color: #99f6e4 !important;
+    background: var(--light-blue) !important;
+    color: var(--teal-dark) !important;
 }
 
 .feature-card {
@@ -437,7 +469,7 @@ textarea.form-control {
 }
 
 #eventContent .card:first-child {
-    background: linear-gradient(135deg, #fff 0%, #f0fdfa 100%);
+    background: #fff;
 }
 
 #ticketCategory,
@@ -461,9 +493,9 @@ textarea.form-control {
 }
 
 .table thead th {
-    background: var(--navy);
+    background: #f8fafc;
     border: 0;
-    color: #fff;
+    color: var(--navy);
     font-size: 0.73rem;
     font-weight: 700;
     letter-spacing: 0.05em;
@@ -546,9 +578,9 @@ textarea.form-control {
 }
 
 footer {
-    background: var(--navy) !important;
-    color: rgba(255, 255, 255, 0.65) !important;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: #fff !important;
+    color: var(--muted) !important;
+    border-top: 1px solid var(--border);
 }
 
 footer small {
@@ -575,6 +607,112 @@ footer small {
     .container-fluid {
         padding-right: 1rem;
         padding-left: 1rem;
+    }
+
+    .page-breadcrumb {
+        margin-bottom: 0;
+        font-size: 0.82rem;
+    }
+
+    .page-breadcrumb a {
+        text-decoration: none;
+    }
+
+    .back-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        min-height: 38px;
+        color: var(--teal-dark);
+        font-size: 0.86rem;
+        font-weight: 700;
+        text-decoration: none;
+    }
+
+    .back-link:hover {
+        color: var(--navy);
+    }
+
+    .required-mark {
+        color: var(--danger);
+    }
+
+    .page-heading h1,
+    .page-heading h2 {
+        letter-spacing: -0.04em;
+    }
+
+    .management-table {
+        min-width: 940px;
+    }
+
+    .management-table th {
+        white-space: nowrap;
+    }
+
+    .management-table td {
+        white-space: normal;
+    }
+
+    .management-table .event-name {
+        min-width: 180px;
+        max-width: 260px;
+        font-weight: 700;
+    }
+
+    .management-table .category-cell,
+    .management-table .venue-cell {
+        max-width: 150px;
+    }
+
+    .management-table .date-cell {
+        min-width: 145px;
+        white-space: nowrap;
+    }
+
+    .management-table .status-cell {
+        min-width: 92px;
+        text-align: center;
+    }
+
+    .management-actions {
+        display: flex;
+        min-width: 260px;
+        flex-wrap: nowrap;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.4rem;
+    }
+
+    .management-actions .btn {
+        min-height: 36px;
+        padding: 0.45rem 0.65rem;
+        white-space: nowrap;
+    }
+
+    .venue-name {
+        min-width: 180px;
+        font-weight: 700;
+    }
+
+    .venue-location {
+        min-width: 150px;
+    }
+
+    .venue-actions {
+        display: flex;
+        min-width: 150px;
+        justify-content: flex-end;
+        gap: 0.4rem;
+    }
+
+    .venue-actions .btn {
+        min-height: 36px;
+    }
+
+    .management-table .empty-row td {
+        padding: 2.5rem 1rem;
+        text-align: center;
     }
 
     .auth-container {
@@ -630,9 +768,7 @@ footer small {
 }
 
 body {
-    background:
-        radial-gradient(circle at 100% 0%, rgba(13, 148, 136, 0.04), transparent 24rem),
-        var(--page) !important;
+    background: var(--page) !important;
 }
 
 img,
@@ -684,11 +820,11 @@ div.container.py-4 > div:first-child h2 {
 }
 
 .hero-section {
-    background: var(--navy);
+    background: var(--page);
 }
 
 .hero-section::after {
-    opacity: 0.5;
+    display: none;
 }
 
 .feature-card,
@@ -795,7 +931,9 @@ div.container.py-4 > div:first-child h2 {
 }
 
 .hire-header {
-    background: var(--navy) !important;
+    background: #fff !important;
+    color: var(--navy) !important;
+    border-bottom: 1px solid var(--border);
     border-radius: 0 0 var(--radius-xl) var(--radius-xl) !important;
 }
 
@@ -992,8 +1130,18 @@ div.container.py-4 > div:first-child h2 {
 .site-footer {
     margin-top: clamp(4rem, 8vw, 7rem);
     padding: 2.5rem 0 1.25rem;
-    background: var(--navy);
-    color: rgba(255, 255, 255, 0.72);
+    background: #fff;
+    color: var(--muted);
+    border-top: 1px solid var(--border);
+}
+
+.site-footer strong {
+    color: var(--navy) !important;
+}
+
+.footer-links a,
+.footer-bottom {
+    color: var(--muted);
 }
 
 .footer-links {
@@ -1004,13 +1152,13 @@ div.container.py-4 > div:first-child h2 {
 }
 
 .footer-links a {
-    color: rgba(255, 255, 255, 0.78);
+    color: var(--primary);
 }
 
 .footer-bottom {
     margin-top: 1.75rem;
     padding-top: 1rem;
-    border-top: 1px solid rgba(255, 255, 255, 0.10);
+    border-top: 1px solid var(--border);
 }
 
 @media (max-width: 767.98px) {
@@ -1142,9 +1290,9 @@ div.container.py-4 > div:first-child h2 {
 .hero-visual::before {
     position: absolute;
     inset: 8% 4% 4% 12%;
-    border: 1px solid rgba(94, 234, 212, 0.22);
+    border: 1px solid #bfdbfe;
     border-radius: 28px;
-    background: rgba(255, 255, 255, 0.035);
+    background: rgba(219, 234, 254, 0.35);
     content: "";
     transform: rotate(3deg);
 }
@@ -1152,7 +1300,7 @@ div.container.py-4 > div:first-child h2 {
 .hero-visual-card {
     position: absolute;
     z-index: 1;
-    border: 1px solid rgba(255, 255, 255, 0.16);
+    border: 1px solid var(--border);
     border-radius: 18px;
     background: rgba(255, 255, 255, 0.97);
     color: var(--ink);
@@ -1179,7 +1327,7 @@ div.container.py-4 > div:first-child h2 {
     flex: 0 0 58px;
     place-items: center;
     border-radius: 14px;
-    background: var(--teal);
+    background: var(--primary);
     color: #fff;
     font-size: 1.35rem;
     font-weight: 800;

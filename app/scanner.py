@@ -26,13 +26,26 @@ def scanner_page():
           rel="stylesheet">
 
         <link
+          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+          rel="stylesheet">
+
+        <link
           rel="stylesheet"
-          href="/static/css/style.css?v=5">
+          href="/static/css/style.css?v=7">
 
         <script src="https://unpkg.com/html5-qrcode"></script>
     </head>
 
     <body class="bg-light">
+
+        <nav class="navbar navbar-dark bg-dark">
+            <div class="container">
+                <a class="navbar-brand" href="/ui">EventSphere Staff</a>
+                <a class="btn btn-outline-light btn-sm" href="/ui">
+                    <i class="bi bi-arrow-left"></i> Back to Dashboard
+                </a>
+            </div>
+        </nav>
 
         <div class="container py-4">
 

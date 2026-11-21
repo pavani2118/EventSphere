@@ -56,6 +56,8 @@ async function loadVenues() {
 
         if (venues.length === 0) {
             empty.classList.remove("d-none");
+            table.innerHTML =
+                '<tr class="empty-row"><td colspan="6"><i class="bi bi-building-x d-block fs-3 mb-2"></i>No venues found. Add the first venue to get started.</td></tr>';
             return;
         }
 
@@ -63,9 +65,11 @@ async function loadVenues() {
             const row = document.createElement("tr");
 
             const name = document.createElement("td");
+            name.className = "venue-name";
             name.textContent = venue.name ?? "";
 
             const location = document.createElement("td");
+            location.className = "venue-location";
             location.textContent = venue.location ?? "";
 
             const capacity = document.createElement("td");
@@ -75,18 +79,21 @@ async function loadVenues() {
             rate.textContent = `LKR ${venue.hourly_rate ?? 0}`;
 
             const hire = document.createElement("td");
-            hire.textContent = venue.private_hire_available ? "Available" : "No";
+            hire.innerHTML = venue.private_hire_available
+                ? '<span class="status-badge status-published">Available</span>'
+                : '<span class="status-badge status-cancelled">Unavailable</span>';
 
             const actions = document.createElement("td");
+            actions.className = "venue-actions";
 
             const edit = document.createElement("button");
-            edit.className = "btn btn-sm btn-warning me-2";
-            edit.textContent = "Edit";
+            edit.className = "btn btn-sm btn-outline-primary";
+            edit.innerHTML = '<i class="bi bi-pencil-square me-1"></i>Edit';
             edit.addEventListener("click", () => editVenue(venue));
 
             const remove = document.createElement("button");
-            remove.className = "btn btn-sm btn-danger";
-            remove.textContent = "Delete";
+            remove.className = "btn btn-sm btn-outline-danger";
+            remove.innerHTML = '<i class="bi bi-trash me-1"></i>Delete';
             remove.addEventListener("click", () => deleteVenue(venue.id));
 
             actions.append(edit, remove);

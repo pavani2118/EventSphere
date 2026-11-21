@@ -55,9 +55,18 @@ async function loadVenues() {
         venues.forEach(venue => {
             const option = document.createElement("option");
             option.value = venue.id;
+            option.dataset.capacity = venue.capacity ?? "";
             option.textContent =
                 `${venue.name} (Capacity: ${venue.capacity})`;
             select.appendChild(option);
+        });
+
+        select.addEventListener("change", () => {
+            const selected = select.options[select.selectedIndex];
+            const hint = document.getElementById("venueCapacityHint");
+            hint.textContent = selected?.dataset.capacity
+                ? `Selected venue capacity: ${selected.dataset.capacity} people`
+                : "";
         });
 
     } catch (error) {
@@ -90,6 +99,8 @@ async function loadEvents() {
 
         if (events.length === 0) {
             empty.classList.remove("d-none");
+            table.innerHTML =
+                '<tr class="empty-row"><td colspan="6"><i class="bi bi-calendar2-x d-block fs-3 mb-2"></i>No events found. Create the first event to get started.</td></tr>';
             return;
         }
 
@@ -97,30 +108,44 @@ async function loadEvents() {
             const row = document.createElement("tr");
 
             const title = document.createElement("td");
+            title.className = "event-name";
             title.textContent = event.title ?? "";
 
             const category = document.createElement("td");
+            category.className = "category-cell";
             category.textContent = event.category ?? "";
 
             const venue = document.createElement("td");
+            venue.className = "venue-cell";
             venue.textContent =
                 event.venue_name ?? event.venue_id ?? "—";
 
             const date = document.createElement("td");
+            date.className = "date-cell";
             date.textContent = event.start_time
-                ? new Date(event.start_time).toLocaleString()
+                ? new Date(event.start_time).toLocaleString("en-US", {
+                    year: "numeric",
+                    month: "short",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit"
+                })
                 : "—";
 
             const status = document.createElement("td");
-            status.textContent = event.status ?? "";
+            status.className = "status-cell";
+            const statusValue = event.status ?? "UNKNOWN";
+            status.innerHTML =
+                `<span class="status-badge status-${statusValue.toLowerCase()}">${statusValue}</span>`;
 
             const actions = document.createElement("td");
+            actions.className = "management-actions";
 
             if (event.status === "DRAFT") {
                 const edit = document.createElement("button");
                 edit.className =
-                    "btn btn-sm btn-warning me-1 mb-1";
-                edit.textContent = "Edit";
+                    "btn btn-sm btn-outline-primary";
+                edit.innerHTML = '<i class="bi bi-pencil-square me-1"></i>Edit';
                 edit.addEventListener(
                     "click",
                     () => editEvent(event)
@@ -128,8 +153,8 @@ async function loadEvents() {
 
                 const categories = document.createElement("button");
                 categories.className =
-                    "btn btn-sm btn-info me-1 mb-1";
-                categories.textContent = "Tickets";
+                    "btn btn-sm btn-outline-secondary";
+                categories.innerHTML = '<i class="bi bi-ticket-perforated me-1"></i>Tickets';
                 categories.addEventListener(
                     "click",
                     () => manageCategories(event.id)
@@ -137,8 +162,8 @@ async function loadEvents() {
 
                 const publish = document.createElement("button");
                 publish.className =
-                    "btn btn-sm btn-success me-1 mb-1";
-                publish.textContent = "Publish";
+                    "btn btn-sm btn-success";
+                publish.innerHTML = '<i class="bi bi-upload me-1"></i>Publish';
                 publish.addEventListener(
                     "click",
                     () => publishEvent(event.id)
@@ -150,8 +175,8 @@ async function loadEvents() {
             if (event.status === "PUBLISHED") {
                 const cancel = document.createElement("button");
                 cancel.className =
-                    "btn btn-sm btn-danger mb-1";
-                cancel.textContent = "Cancel";
+                    "btn btn-sm btn-outline-danger";
+                cancel.innerHTML = '<i class="bi bi-x-circle me-1"></i>Cancel';
                 cancel.addEventListener(
                     "click",
                     () => cancelEvent(event.id)
