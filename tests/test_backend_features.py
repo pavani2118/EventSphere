@@ -160,6 +160,20 @@ def test_login_preserves_safe_booking_return_url():
     assert '!next.startsWith("//")' in script
 
 
+def test_attendee_pages_restore_token_from_local_storage():
+    for relative_path in (
+        "app/static/js/my-tickets.js",
+        "app/static/js/my-bookings.js",
+        "app/static/js/my-waitlist.js",
+        "app/static/js/notifications.js"
+    ):
+        with open(relative_path, "r", encoding="utf-8") as script_file:
+            script = script_file.read()
+
+        assert 'localStorage.getItem("access_token")' in script
+        assert 'sessionStorage.clear()' in script
+
+
 def test_gate_validation_accepts_valid_successful_ticket():
     ticket = {
         "ticket_id": 7,

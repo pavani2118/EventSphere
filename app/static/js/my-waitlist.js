@@ -1,4 +1,8 @@
-const token = sessionStorage.getItem("access_token");
+const token = (
+    sessionStorage.getItem("access_token")
+    || localStorage.getItem("access_token")
+    || ""
+).trim();
 
 if (!token) window.location.href = "/ui/login";
 
@@ -46,6 +50,8 @@ async function loadWaitlist() {
     });
     if (response.status === 401 || response.status === 403) {
         sessionStorage.clear();
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("user");
         window.location.href = "/ui/login";
         return;
     }
@@ -86,6 +92,8 @@ async function loadWaitlist() {
 
 document.getElementById("logoutButton").addEventListener("click", () => {
     sessionStorage.clear();
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("user");
     window.location.href = "/ui/login";
 });
 

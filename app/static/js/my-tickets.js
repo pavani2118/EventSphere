@@ -1,7 +1,11 @@
 
 const API_BASE = "";
 
-const token = sessionStorage.getItem("access_token");
+const token = (
+    sessionStorage.getItem("access_token")
+    || localStorage.getItem("access_token")
+    || ""
+).trim();
 
 if (!token) {
     window.location.href = "/ui/login";
@@ -17,6 +21,8 @@ async function apiRequest(url) {
 
     if (response.status === 401 || response.status === 403) {
         sessionStorage.clear();
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("user");
         window.location.href = "/ui/login";
         throw new Error("Please log in again.");
     }
@@ -258,8 +264,9 @@ async function loadQRCode(ticketId) {
 // -------------------------
 
 function logout() {
-    sessionStorage.removeItem("access_token");
-    sessionStorage.removeItem("user");
+    sessionStorage.clear();
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("user");
     window.location.href = "/ui/login";
 }
 
