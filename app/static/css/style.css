@@ -630,7 +630,7 @@ footer small {
 
     .management-table {
         width: 100%;
-        min-width: 1080px;
+        min-width: 1120px;
         table-layout: fixed;
     }
 
@@ -645,11 +645,11 @@ footer small {
     .management-table th:nth-child(5),
     .management-table td:nth-child(5) { width: 105px; }
     .management-table th:nth-child(6),
-    .management-table td:nth-child(6) { width: 280px; }
+    .management-table td:nth-child(6) { width: 330px; }
 
     .management-actions {
-        width: 280px !important;
-        min-width: 280px !important;
+        width: 330px !important;
+        min-width: 330px !important;
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
@@ -673,20 +673,30 @@ footer small {
         flex: 0 0 auto;
     }
 
+    .management-actions .btn-outline-primary,
+    .management-actions .btn-outline-secondary,
+    .management-actions .btn-success {
+        width: auto;
+    }
+
     .venue-management-table th:nth-child(6),
     .venue-management-table td:nth-child(6) {
-        width: 180px;
+        width: 210px;
     }
 
     .venue-actions {
-        width: 180px !important;
-        min-width: 180px !important;
+        width: 210px !important;
+        min-width: 210px !important;
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
         align-items: center !important;
         justify-content: flex-start !important;
         gap: 8px !important;
+    }
+
+    .venue-actions .btn {
+        flex: 0 0 auto;
     }
 
     @media (max-width: 575.98px) {
@@ -1059,12 +1069,12 @@ footer small {
 
     .venue-management-table th:nth-child(6),
     .venue-management-table td:nth-child(6) {
-        width: 180px;
+        width: 210px;
     }
 
     .venue-actions {
-        width: 180px;
-        min-width: 180px;
+        width: 210px;
+        min-width: 210px;
         display: flex !important;
         flex-direction: row;
         flex-wrap: nowrap;
@@ -1958,4 +1968,75 @@ div.container.py-4 > div:first-child h2 {
     .hero-visual-stat {
         width: 155px;
     }
+}
+
+/* Keep event row actions on one clean horizontal line where the table has
+   enough space; stack them only on genuinely small screens. */
+.management-table .management-actions {
+    width: 330px !important;
+    min-width: 330px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 8px !important;
+}
+
+.management-table .management-actions .btn {
+    width: auto !important;
+    min-width: 0 !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    margin: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    white-space: nowrap !important;
+}
+
+.management-table th:nth-child(6),
+.management-table td:nth-child(6) {
+    width: 330px !important;
+}
+
+@media (max-width: 575.98px) {
+    .management-table .management-actions {
+        width: 150px !important;
+        min-width: 150px !important;
+        flex-direction: column !important;
+        align-items: stretch !important;
+    }
+
+    .management-table .management-actions .btn {
+        width: 100% !important;
+    }
+}
+
+/* Venue action buttons stay in one horizontal, evenly spaced row. */
+.venue-management-table th:nth-child(6),
+.venue-management-table td:nth-child(6) {
+    width: 210px !important;
+}
+
+.venue-management-table .venue-actions {
+    width: 210px !important;
+    min-width: 210px !important;
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 8px !important;
+}
+
+.venue-management-table .venue-actions .btn {
+    width: auto !important;
+    height: 38px !important;
+    min-height: 38px !important;
+    margin: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    white-space: nowrap !important;
 }
