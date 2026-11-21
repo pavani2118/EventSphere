@@ -55,6 +55,11 @@ Application logic also relies on:
 
 ## Migration safety
 
+Review [database/migrations/neon_final_migration.sql](../database/migrations/neon_final_migration.sql)
+before any existing-database deployment. It adds the ticket QR uniqueness
+preflight and reinforces safe indexes/foreign-key support. It does not alter
+or delete records.
+
 For a fresh Neon database, apply `database/schema.sql` once. It includes the
 end state of `database/migrations/001_waitlist_idempotency.sql`; do not run
 that migration a second time on the newly bootstrapped database.
